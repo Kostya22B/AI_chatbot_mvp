@@ -294,7 +294,9 @@
             activeChatId = chatId;
             
             if (chatId) {
-                chatMessagesContainer.innerHTML = '';
+                // Safely remove only message elements, keeping the indicator intact.
+                chatMessagesContainer.querySelectorAll('.message-wrapper').forEach(el => el.remove());
+
                 initialView.classList.add('hidden');
                 chatMessagesContainer.classList.remove('hidden');
                 
