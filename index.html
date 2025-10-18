@@ -26,6 +26,9 @@
                 transform: translateX(-100%);
             }
         }
+        .typing-dot {
+            animation: pulse 1.4s infinite;
+        }
     </style>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
@@ -116,6 +119,15 @@
 
                     <div id="chat-messages-container" class="hidden flex-1 overflow-y-auto chat-container pr-2 space-y-4">
                         <!-- Messages will appear here -->
+                        <div id="typing-indicator" class="hidden flex mb-4 justify-start">
+                            <div class="max-w-xs lg:max-w-md p-3 rounded-2xl bg-gray-200 dark:bg-gray-700">
+                                <div class="flex items-center space-x-1">
+                                    <span class="w-2 h-2 bg-gray-500 rounded-full typing-dot" style="animation-delay: 0s;"></span>
+                                    <span class="w-2 h-2 bg-gray-500 rounded-full typing-dot" style="animation-delay: 0.2s;"></span>
+                                    <span class="w-2 h-2 bg-gray-500 rounded-full typing-dot" style="animation-delay: 0.4s;"></span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -128,7 +140,7 @@
                         </select>
                         <div class="flex-1 relative">
                             <input id="message-input" type="text" placeholder="Отправьте сообщение..." class="w-full p-3 pr-12 bg-gray-200 dark:bg-gray-700 border border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
-                            <button id="send-btn" class="absolute inset-y-0 right-0 px-4 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 disabled:opacity-50" disabled>
+                            <button id="send-btn" type="button" class="absolute inset-y-0 right-0 px-4 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 disabled:opacity-50" disabled>
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-send"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
                             </button>
                         </div>
@@ -150,9 +162,6 @@
         
         const authScreen = document.getElementById('auth-screen');
 
-        // --- Проверка конфигурации Supabase ---
-        // ИСПРАВЛЕНИЕ: Эта проверка теперь сравнивает с исходными значениями-заглушками.
-        // НЕ ТРОГАЙТЕ ЭТОТ БЛОК.
         if (SUPABASE_URL === 'YOUR_SUPABASE_URL' || SUPABASE_ANON_KEY === 'YOUR_SUPABASE_ANON_KEY') {
             authScreen.innerHTML = `
                 <div class="w-full max-w-lg m-auto bg-red-100 dark:bg-red-900/50 rounded-2xl shadow-xl p-8 border border-red-500 dark:border-red-700 text-center">
@@ -161,9 +170,6 @@
                         Пожалуйста, откройте файл <strong>index.html</strong> и замените
                         <code>YOUR_SUPABASE_URL</code> и <code>YOUR_SUPABASE_ANON_KEY</code>
                         на настоящие ключи из вашего проекта Supabase.
-                    </p>
-                    <p class="mt-4 text-sm text-gray-500 dark:text-gray-400">
-                        Эта ошибка возникает, потому что приложение не может подключиться к базе данных без правильных учетных данных.
                     </p>
                 </div>
             `;
@@ -189,6 +195,7 @@
         const userEmailDisplay = document.getElementById('user-email');
         const menuToggle = document.getElementById('menu-toggle');
         const sidebar = document.getElementById('sidebar');
+        const typingIndicator = document.getElementById('typing-indicator');
 
         let currentUser = null;
         let activeChatId = null;
@@ -205,14 +212,19 @@
             chatScreen.style.display = 'flex';
             userEmailDisplay.textContent = user.email;
             loadChatHistory();
-            setActiveChat(null);
+        };
+
+        const showTypingIndicator = () => {
+            typingIndicator.classList.remove('hidden');
+            chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
+        };
+
+        const hideTypingIndicator = () => {
+            typingIndicator.classList.add('hidden');
         };
         
         const toggleSidebar = () => sidebar.classList.toggle('sidebar-closed');
-
-        const updateSendButton = () => {
-             sendBtn.disabled = messageInput.value.trim().length === 0;
-        }
+        const updateSendButton = () => sendBtn.disabled = messageInput.value.trim().length === 0;
 
         // --- Логика Аутентификации ---
         loginForm.addEventListener('submit', async (e) => {
@@ -220,14 +232,11 @@
             const email = document.getElementById('login-email').value;
             const password = document.getElementById('login-password').value;
             const errorEl = document.getElementById('login-error');
-
+            errorEl.classList.add('hidden');
             const { error } = await db.auth.signInWithPassword({ email, password });
-
             if (error) {
                 errorEl.textContent = 'Неверный email или пароль.';
                 errorEl.classList.remove('hidden');
-            } else {
-                errorEl.classList.add('hidden');
             }
         });
 
@@ -236,39 +245,28 @@
             const email = document.getElementById('signup-email').value;
             const password = document.getElementById('signup-password').value;
             const errorEl = document.getElementById('signup-error');
-
-            const { error } = await db.auth.signUp({ email, password });
-
+            errorEl.classList.add('hidden');
+            const { data, error } = await db.auth.signUp({ email, password });
             if (error) {
                 errorEl.textContent = 'Ошибка регистрации. Возможно, пользователь уже существует.';
                 errorEl.classList.remove('hidden');
             } else {
-                errorEl.classList.add('hidden');
-                // Можно показать сообщение о необходимости подтвердить email
+                 alert('Регистрация прошла успешно! Пожалуйста, проверьте свою почту для подтверждения.');
             }
         });
 
-        logoutBtn.addEventListener('click', async () => await db.auth.signOut());
-
-        showSignup.addEventListener('click', (e) => {
-            e.preventDefault();
-            loginForm.classList.add('hidden');
-            signupForm.classList.remove('hidden');
+        logoutBtn.addEventListener('click', async () => {
+            await db.auth.signOut();
+            window.location.hash = '';
         });
-
-        showLogin.addEventListener('click', (e) => {
-            e.preventDefault();
-            signupForm.classList.add('hidden');
-            loginForm.classList.remove('hidden');
-        });
-
+        showSignup.addEventListener('click', (e) => { e.preventDefault(); loginForm.classList.add('hidden'); signupForm.classList.remove('hidden'); });
+        showLogin.addEventListener('click', (e) => { e.preventDefault(); signupForm.classList.add('hidden'); loginForm.classList.remove('hidden'); });
         menuToggle.addEventListener('click', toggleSidebar);
         
         // --- Логика Чата ---
         const loadChatHistory = async () => {
             if (!currentUser) return;
             chatHistoryContainer.innerHTML = '<div>Загрузка...</div>';
-            
             const { data: chats, error } = await db.from('chats').select('id, title').eq('user_id', currentUser.id).order('created_at', { ascending: false });
 
             if (error) {
@@ -279,10 +277,10 @@
 
             chatHistoryContainer.innerHTML = '';
             chats.forEach(chat => {
-                const chatElement = document.createElement('div');
-                chatElement.className = `p-3 my-1 rounded-lg cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors truncate ${chat.id === activeChatId ? 'bg-indigo-200 dark:bg-indigo-800 font-semibold' : ''}`;
+                const chatElement = document.createElement('a');
+                chatElement.href = `#${chat.id}`;
+                chatElement.className = `block p-3 my-1 rounded-lg cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors truncate ${chat.id === activeChatId ? 'bg-indigo-200 dark:bg-indigo-800 font-semibold' : ''}`;
                 chatElement.textContent = chat.title || 'Новый чат';
-                chatElement.addEventListener('click', () => setActiveChat(chat.id));
                 chatHistoryContainer.appendChild(chatElement);
             });
         };
@@ -294,121 +292,128 @@
             }
 
             activeChatId = chatId;
+            
             if (chatId) {
-                chatMessagesContainer.innerHTML = '<div>Загрузка сообщений...</div>';
+                chatMessagesContainer.innerHTML = '';
                 initialView.classList.add('hidden');
                 chatMessagesContainer.classList.remove('hidden');
                 
                 const { data: chat, error } = await db.from('chats').select('messages').eq('id', chatId).single();
+                if (error) { console.error('Ошибка загрузки чата:', error); return; }
 
-                if (error) {
-                    console.error('Ошибка загрузки чата:', error);
-                    return;
-                }
-
-                chatMessagesContainer.innerHTML = '';
                 if (chat.messages) {
                     chat.messages.forEach(msg => addMessageToUI(msg.sender, msg.text));
                 }
                 
-                // Подписываемся на обновления в реальном времени
                 chatSubscription = db.channel(`chat_${chatId}`)
                     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chats', filter: `id=eq.${chatId}` }, payload => {
                         const updatedMessages = payload.new.messages;
                         if (!updatedMessages) return;
-                        const lastMessage = updatedMessages[updatedMessages.length - 1];
-                        if (lastMessage.sender === 'ai') {
-                             addMessageToUI(lastMessage.sender, lastMessage.text);
+                        const oldMessagesCount = chatMessagesContainer.querySelectorAll('.message-wrapper').length;
+                        if (updatedMessages.length > oldMessagesCount) {
+                            const lastMessage = updatedMessages[updatedMessages.length - 1];
+                            if(lastMessage.sender === 'ai') {
+                                hideTypingIndicator();
+                                addMessageToUI(lastMessage.sender, lastMessage.text);
+                            }
                         }
                     }).subscribe();
-
             } else {
                  initialView.classList.remove('hidden');
                  chatMessagesContainer.classList.add('hidden');
-                 chatMessagesContainer.innerHTML = '';
             }
             loadChatHistory();
         };
         
-        newChatBtn.addEventListener('click', () => setActiveChat(null));
+        newChatBtn.addEventListener('click', () => { window.location.hash = ''; });
         
         const handleSendMessage = async () => {
             const text = messageInput.value.trim();
             if (!text || !currentUser) return;
 
-            addMessageToUI('user', text);
-            const userInput = messageInput.value;
+            const userMessage = { sender: 'user', text };
+            addMessageToUI(userMessage.sender, userMessage.text);
             messageInput.value = '';
             updateSendButton();
+            showTypingIndicator();
 
-            let currentMessages = [];
-            let currentChatId = activeChatId;
+            try {
+                let currentChatId = activeChatId;
+                let currentMessages = [];
 
-            if (!currentChatId) {
-                 // Создаем новый чат
-                const { data, error } = await db.from('chats').insert({
-                    user_id: currentUser.id,
-                    title: text.substring(0, 40),
-                    messages: [{ sender: 'user', text }]
-                }).select('id, messages').single();
-
-                if (error) {
-                    console.error('Ошибка создания чата:', error);
-                    return;
+                if (!currentChatId) {
+                    const { data, error } = await db.from('chats').insert({
+                        user_id: currentUser.id,
+                        title: text.substring(0, 40),
+                        messages: [userMessage]
+                    }).select('id, messages').single();
+                    if (error) throw error;
+                    
+                    currentChatId = data.id;
+                    currentMessages = data.messages;
+                    window.location.hash = currentChatId;
+                } else {
+                    const { data: chatData, error: fetchError } = await db.from('chats').select('messages').eq('id', currentChatId).single();
+                    if (fetchError) throw fetchError;
+                    currentMessages = [...(chatData.messages || []), userMessage];
+                    
+                    const { error: updateError } = await db.from('chats').update({ messages: currentMessages }).eq('id', currentChatId);
+                    if (updateError) throw updateError;
                 }
-                currentChatId = data.id;
-                currentMessages = data.messages;
-                await setActiveChat(currentChatId);
-            } else {
-                // Обновляем существующий чат
-                const { data: chatData, error: fetchError } = await db.from('chats').select('messages').eq('id', currentChatId).single();
-                if (fetchError) { console.error('Ошибка получения сообщений:', fetchError); return; }
-
-                currentMessages = [...(chatData.messages || []), { sender: 'user', text }];
                 
-                const { error: updateError } = await db.from('chats').update({ messages: currentMessages }).eq('id', currentChatId);
-                if (updateError) { console.error('Ошибка обновления чата:', updateError); return; }
+                // Имитация ответа AI с небольшой задержкой для UX
+                setTimeout(async () => {
+                    try {
+                        const aiResponse = { sender: 'ai', text: "AI response" };
+                        const finalMessages = [...currentMessages, aiResponse];
+                        const { error } = await db.from('chats').update({ messages: finalMessages }).eq('id', currentChatId);
+                        if (error) throw error;
+                    } catch(err) {
+                        console.error('Ошибка при получении ответа AI:', err);
+                        hideTypingIndicator();
+                        addMessageToUI('ai', 'Извините, произошла ошибка.');
+                    }
+                }, 800);
+
+            } catch (err) {
+                console.error('Ошибка отправки сообщения:', err);
+                hideTypingIndicator();
+                addMessageToUI('ai', 'Не удалось отправить сообщение.');
             }
-            
-            // Имитация ответа AI
-            setTimeout(async () => {
-                const aiResponse = "AI response";
-                const updatedMessages = [...currentMessages, { sender: 'ai', text: aiResponse }];
-                await db.from('chats').update({ messages: updatedMessages }).eq('id', currentChatId);
-            }, 1000);
         };
 
         sendBtn.addEventListener('click', handleSendMessage);
-        messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !sendBtn.disabled) handleSendMessage();
-        });
+        messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !sendBtn.disabled) handleSendMessage(); });
         messageInput.addEventListener('input', updateSendButton);
-
 
         const addMessageToUI = (sender, text) => {
             const messageWrapper = document.createElement('div');
-            messageWrapper.className = `flex mb-4 ${sender === 'user' ? 'justify-end' : 'justify-start'}`;
-            
+            messageWrapper.className = `flex mb-4 message-wrapper ${sender === 'user' ? 'justify-end' : 'justify-start'}`;
             const messageBubble = document.createElement('div');
             messageBubble.className = `max-w-xs lg:max-w-md p-3 rounded-2xl ${sender === 'user' ? 'bg-indigo-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100'}`;
             messageBubble.textContent = text;
-            
             messageWrapper.appendChild(messageBubble);
-            chatMessagesContainer.appendChild(messageWrapper);
+            typingIndicator.before(messageWrapper);
             chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
         };
+        
+        const handleUrlChange = () => {
+            if (currentUser) {
+                const chatId = window.location.hash.substring(1);
+                setActiveChat(chatId || null);
+            }
+        };
 
-        // --- Инициализация приложения и отслеживание состояния аутентификации ---
+        window.addEventListener('hashchange', handleUrlChange);
+
         db.auth.onAuthStateChange((event, session) => {
-            const loginFormContainer = document.getElementById('auth-form-container');
-            if (loginFormContainer) { // Убедимся, что контейнер формы существует
-                 if (session) {
-                    currentUser = session.user;
-                    showChatScreen(currentUser);
-                } else {
-                    currentUser = null;
-                    showAuthScreen();
-                }
+            if (session) {
+                currentUser = session.user;
+                showChatScreen(currentUser);
+                handleUrlChange();
+            } else {
+                currentUser = null;
+                showAuthScreen();
             }
         });
 
