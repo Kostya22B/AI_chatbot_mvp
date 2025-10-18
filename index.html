@@ -337,12 +337,37 @@
 
             chatHistoryContainer.innerHTML = '';
             chats.forEach(chat => {
-                const chatElement = document.createElement('a');
-                chatElement.href = `#${chat.id}`;
-                chatElement.className = `block p-3 my-1 rounded-lg cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors truncate ${chat.id === activeChatId ? 'bg-indigo-200 dark:bg-indigo-800 font-semibold' : ''}`;
-                chatElement.textContent = chat.title || 'Новый чат';
-                chatHistoryContainer.appendChild(chatElement);
+                const chatItem = document.createElement('div');
+                chatItem.className = 'flex items-center justify-between p-3 my-1 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors';
+
+                const chatLink = document.createElement('a');
+                chatLink.href = `#${chat.id}`;
+                chatLink.className = `truncate flex-1 ${chat.id === activeChatId ? 'font-semibold text-indigo-600' : ''}`;
+                chatLink.textContent = chat.title || 'Новый чат';
+
+                const delBtn = document.createElement('button');
+                delBtn.innerHTML = '✕';
+                delBtn.className = 'ml-3 text-red-500 hover:text-red-700 font-bold';
+                delBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    if (!confirm('Удалить этот чат?')) return;
+                    const { error } = await db.from('chats').delete().eq('id', chat.id);
+                    if (error) console.error('Ошибка удаления:', error);
+                    else {
+                        if (chat.id === activeChatId) {
+                            window.location.hash = '';
+                            activeChatId = null;
+                        }
+                        loadChatHistory();
+                    }
+                });
+
+                chatItem.appendChild(chatLink);
+                chatItem.appendChild(delBtn);
+                chatHistoryContainer.appendChild(chatItem);
             });
+
         };
 
         const setActiveChat = async (chatId) => {
