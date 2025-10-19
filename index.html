@@ -630,16 +630,21 @@
 
         window.addEventListener('hashchange', handleUrlChange);
 
-        db.auth.onAuthStateChange((event, session) => {
-            if (session) {
+        let chatInitialized = false;
+
+        db.auth.onAuthStateChange(async (event, session) => {
+            if (session && !chatInitialized) {
+                chatInitialized = true;
                 currentUser = session.user;
-                showChatScreen(currentUser);
+                await showChatScreen(currentUser);
                 handleUrlChange();
-            } else {
+            } else if (!session) {
+                chatInitialized = false;
                 currentUser = null;
                 showAuthScreen();
             }
         });
+
 
     </script>
 </body>
