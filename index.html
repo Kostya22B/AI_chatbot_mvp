@@ -7,10 +7,9 @@
     <title>University AI Helper</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Tom Select for searchable dropdown -->
     <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -40,7 +39,6 @@
         .typing-dot {
             animation: pulse 1.4s infinite;
         }
-
         /* Tom Select Styles Override for Dark Mode */
         .ts-control {
             background-color: #f3f4f6; /* bg-gray-100 */
@@ -110,12 +108,16 @@
                     <form id="signup-form" class="space-y-6 hidden">
                         <h2 class="text-2xl font-semibold text-center text-gray-700 dark:text-gray-200">Регистрация</h2>
                         <div>
-                            <label for="signup-email" class="text-sm font-medium text-gray-600 dark:text-gray-400">Email</label>
-                            <input id="signup-email" type="email" required class="w-full p-3 mt-1 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+                            <label for="signup-email"
+                                class="text-sm font-medium text-gray-600 dark:text-gray-400">Email</label>
+                            <input id="signup-email" type="email" required
+                                class="w-full p-3 mt-1 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
                         </div>
                         <div>
-                            <label for="signup-password" class="text-sm font-medium text-gray-600 dark:text-gray-400">Пароль</label>
-                            <input id="signup-password" type="password" required class="w-full p-3 mt-1 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+                            <label for="signup-password"
+                                class="text-sm font-medium text-gray-600 dark:text-gray-400">Пароль</label>
+                            <input id="signup-password" type="password" required
+                                class="w-full p-3 mt-1 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
                         </div>
                         <div>
                             <label for="university-select" class="text-sm font-medium text-gray-600 dark:text-gray-400">Университет</label>
@@ -135,8 +137,9 @@
 
         <!-- Chat Screen -->
         <div id="chat-screen" class="hidden w-full h-full md:flex">
-             <!-- Sidebar -->
-            <div id="sidebar" class="sidebar absolute md:relative z-20 w-80 md:w-1/4 bg-gray-200 dark:bg-gray-800 p-4 flex flex-col h-full border-r dark:border-gray-700 sidebar-closed md:transform-none">
+            <!-- Sidebar -->
+            <div id="sidebar"
+                class="sidebar absolute md:relative z-20 w-80 md:w-1/4 bg-gray-200 dark:bg-gray-800 p-4 flex flex-col h-full border-r dark:border-gray-700 sidebar-closed md:transform-none">
                 <div class="flex-shrink-0 mb-4">
                     <button id="new-chat-btn"
                         class="w-full flex items-center justify-center gap-2 bg-indigo-600 text-white p-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors">
@@ -170,7 +173,7 @@
             <div class="flex-1 flex flex-col bg-white dark:bg-gray-900">
                 <header
                     class="flex-shrink-0 p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-                    <h1 class="text-2xl font-bold">AI Helper</h1>
+                    <h1 id="greeting-header" class="text-2xl font-bold">AI Helper</h1>
                     <div class="md:hidden">
                         <button id="menu-toggle" class="text-gray-500 focus:outline-none">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"
@@ -194,7 +197,7 @@
                                 </path>
                             </svg>
                         </div>
-                        <h2 id="greeting-header" class="text-3xl font-bold mb-2">Hello, student.</h2>
+                        <h2 id="initial-greeting" class="text-3xl font-bold mb-2">Hello, student.</h2>
                         <p class="text-lg text-gray-500 dark:text-gray-400">Чем я могу помочь вам сегодня?</p>
                     </div>
 
@@ -253,7 +256,7 @@
         const SUPABASE_URL = 'https://mmgcxilliiwuskuiiwqf.supabase.co'; // Замените на URL вашего проекта
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1tZ2N4aWxsaWl3dXNrdWlpd3FmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA1OTQ5MzMsImV4cCI6MjA3NjE3MDkzM30.JIUMJzkV08K_ziQzVSyaqvUF_REZpGOAlyH7_C8tSvw'; // Замените на ваш anon public ключ
         // =================================================================================
-        
+
         const authScreen = document.getElementById('auth-screen');
 
         if (SUPABASE_URL === 'YOUR_SUPABASE_URL' || SUPABASE_ANON_KEY === 'YOUR_SUPABASE_ANON_KEY') {
@@ -272,7 +275,7 @@
         }
 
         const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        
+
         // --- DOM Элементы ---
         const chatScreen = document.getElementById('chat-screen');
         const loginForm = document.getElementById('login-form');
@@ -290,6 +293,7 @@
         const menuToggle = document.getElementById('menu-toggle');
         const sidebar = document.getElementById('sidebar');
         const typingIndicator = document.getElementById('typing-indicator');
+        const initialGreeting = document.getElementById('initial-greeting');
         const greetingHeader = document.getElementById('greeting-header');
         const universitySelect = document.getElementById('university-select');
 
@@ -310,21 +314,18 @@
             authScreen.style.display = 'none';
             chatScreen.style.display = 'flex';
             userEmailDisplay.textContent = user.email;
-
-            // Fetch user profile to get university name
-            const { data: profile, error } = await db
-                .from('profiles')
-                .select(`
-                    universities ( name )
-                `)
-                .eq('id', user.id)
-                .single();
-
+            
+            // Fetch profile to get university name
+            const { data: profile, error } = await db.from('profiles').select('universities(name)').eq('id', user.id).single();
             if (error) {
-                console.error("Error fetching profile:", error);
-                greetingHeader.textContent = `Hello, student.`;
+                console.error("Could not fetch user's university", error);
+            } else if (profile && profile.universities) {
+                const universityName = profile.universities.name;
+                initialGreeting.textContent = `Hello, student of ${universityName}.`;
+                greetingHeader.textContent = universityName;
             } else {
-                 greetingHeader.textContent = `Hello, student of ${profile.universities.name}.`;
+                 initialGreeting.textContent = `Hello, student.`;
+                 greetingHeader.textContent = `AI Helper`;
             }
 
             loadChatHistory();
@@ -333,7 +334,7 @@
         const loadUniversities = async () => {
             const { data, error } = await db.from('universities').select('id, name');
             if (error) {
-                console.error("Could not load universities", error);
+                console.error('Ошибка загрузки университетов:', error);
                 return;
             }
 
@@ -366,7 +367,7 @@
         const hideTypingIndicator = () => {
             typingIndicator.classList.add('hidden');
         };
-        
+
         const toggleSidebar = () => sidebar.classList.toggle('sidebar-closed');
         const updateSendButton = () => sendBtn.disabled = messageInput.value.trim().length === 0;
 
@@ -415,10 +416,10 @@
                 errorEl.textContent = 'Ошибка регистрации. Возможно, пользователь уже существует.';
                 errorEl.classList.remove('hidden');
             } else {
-                 alert('Регистрация прошла успешно! Пожалуйста, проверьте свою почту для подтверждения.');
-                 // Switch back to login form
-                 signupForm.classList.add('hidden');
-                 loginForm.classList.remove('hidden');
+                alert('Регистрация прошла успешно! Пожалуйста, проверьте свою почту для подтверждения.');
+                // Switch back to login form after successful signup
+                signupForm.classList.add('hidden');
+                loginForm.classList.remove('hidden');
             }
         });
 
@@ -429,7 +430,7 @@
         showSignup.addEventListener('click', (e) => { e.preventDefault(); loginForm.classList.add('hidden'); signupForm.classList.remove('hidden'); });
         showLogin.addEventListener('click', (e) => { e.preventDefault(); signupForm.classList.add('hidden'); loginForm.classList.remove('hidden'); });
         menuToggle.addEventListener('click', toggleSidebar);
-        
+
         // --- Логика Чата ---
         const loadChatHistory = async () => {
             if (!currentUser) return;
@@ -485,7 +486,7 @@
 
             activeChatId = chatId;
             
-            // More robust way to clear previous messages, preserving the typing indicator
+            // Clear previous messages, preserving the typing indicator
             while (chatMessagesContainer.firstChild && chatMessagesContainer.firstChild !== typingIndicator) {
                 chatMessagesContainer.removeChild(chatMessagesContainer.firstChild);
             }
@@ -501,15 +502,16 @@
                     chat.messages.forEach(msg => addMessageToUI(msg.sender, msg.text));
                 }
                 
-                // Subscription now primarily for real-time sync across devices, not for showing AI response.
                 chatSubscription = db.channel(`chat_${chatId}`)
                     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chats', filter: `id=eq.${chatId}` }, payload => {
+                        // When a change is detected, simply clear the chat and re-render with the new data.
+                        // This is a robust way to ensure the UI is always in sync with the DB.
+                        while (chatMessagesContainer.firstChild && chatMessagesContainer.firstChild !== typingIndicator) {
+                            chatMessagesContainer.removeChild(chatMessagesContainer.firstChild);
+                        }
                         const updatedMessages = payload.new.messages;
-                        const currentMessagesCount = chatMessagesContainer.querySelectorAll('.message-wrapper').length;
-                        // Simple refresh if message count is different to avoid complex logic and sync across devices
-                        if (updatedMessages && updatedMessages.length !== currentMessagesCount) {
-                           // Re-fetch and render the chat to ensure sync
-                           setActiveChat(chatId);
+                        if (updatedMessages) {
+                            updatedMessages.forEach(msg => addMessageToUI(msg.sender, msg.text));
                         }
                     }).subscribe();
             } else {
@@ -520,7 +522,7 @@
         };
         
         newChatBtn.addEventListener('click', () => { window.location.hash = ''; });
-        
+
         const handleSendMessage = async () => {
             const text = messageInput.value.trim();
             if (!text || !currentUser) return;
@@ -561,7 +563,6 @@
                 }
                 
                 // --- AI Response Simulation ---
-                // This now happens immediately after user message is persisted
                 setTimeout(() => {
                     const aiResponse = { sender: 'ai', text: "AI response" };
                     hideTypingIndicator();
@@ -575,7 +576,7 @@
                       .then(({ error }) => {
                         if (error) console.error('Error saving AI response:', error);
                       });
-                }, 500); // Reduced delay
+                }, 500);
 
             } catch (err) {
                 console.error('Ошибка отправки сообщения:', err);
@@ -595,10 +596,10 @@
             messageBubble.className = `max-w-xs lg:max-w-md p-3 rounded-2xl ${sender === 'user' ? 'bg-indigo-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100'}`;
             messageBubble.textContent = text;
             messageWrapper.appendChild(messageBubble);
-            typingIndicator.before(messageWrapper);
+            typingIndicator.before(messageWrapper); // Insert before the typing indicator
             chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
         };
-        
+
         const handleUrlChange = () => {
             if (currentUser) {
                 const chatId = window.location.hash.substring(1);
@@ -623,6 +624,4 @@
 </body>
 
 </html>
-
-
 
