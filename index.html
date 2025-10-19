@@ -277,7 +277,7 @@
                 const { data: profile, error } = await db
                     .from('profiles')
                     .select('universities(name)')
-                    .eq('id', user.id)
+                    .eq('id', id)
                     .single();
 
                 if (error) throw error;
