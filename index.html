@@ -39,34 +39,48 @@
         .typing-dot {
             animation: pulse 1.4s infinite;
         }
+
         /* Tom Select Styles Override for Dark Mode */
         .ts-control {
-            background-color: #f3f4f6; /* bg-gray-100 */
+            background-color: #f3f4f6;
+            /* bg-gray-100 */
             border-radius: 0.5rem;
-            border: 1px solid #d1d5db; /* border-gray-300 */
+            border: 1px solid #d1d5db;
+            /* border-gray-300 */
             padding: 0.60rem 0.75rem;
         }
+
         .dark .ts-control {
-            background-color: #1f2937; /* dark:bg-gray-800 */
-            border: 1px solid #4b5563; /* dark:border-gray-700 */
-            color: #f9fafb; /* dark:text-gray-100 */
+            background-color: #1f2937;
+            /* dark:bg-gray-800 */
+            border: 1px solid #4b5563;
+            /* dark:border-gray-700 */
+            color: #f9fafb;
+            /* dark:text-gray-100 */
         }
+
         .ts-dropdown {
             background: #ffffff;
             border: 1px solid #d1d5db;
         }
+
         .dark .ts-dropdown {
-             background: #1f2937;
-             border: 1px solid #4b5563;
+            background: #1f2937;
+            border: 1px solid #4b5563;
         }
+
         .dark .ts-dropdown .option {
             color: #f9fafb;
         }
-         .dark .ts-dropdown .option:hover {
-            background-color: #374151; /* dark:bg-gray-600 */
+
+        .dark .ts-dropdown .option:hover {
+            background-color: #374151;
+            /* dark:bg-gray-600 */
         }
+
         .ts-control.invalid {
-            border-color: #ef4444; /* border-red-500 */
+            border-color: #ef4444;
+            /* border-red-500 */
         }
     </style>
 </head>
@@ -120,7 +134,8 @@
                                 class="w-full p-3 mt-1 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
                         </div>
                         <div>
-                            <label for="university-select" class="text-sm font-medium text-gray-600 dark:text-gray-400">Университет</label>
+                            <label for="university-select"
+                                class="text-sm font-medium text-gray-600 dark:text-gray-400">Университет</label>
                             <select id="university-select" placeholder="Выберите университет..." class="mt-1">
                                 <!-- Options will be populated from DB -->
                             </select>
@@ -314,7 +329,7 @@
             authScreen.style.display = 'none';
             chatScreen.style.display = 'flex';
             userEmailDisplay.textContent = user.email;
-            
+
             // Fetch profile to get university name
             const { data: profile, error } = await db.from('profiles').select('universities(name)').eq('id', user.id).single();
             if (error) {
@@ -324,8 +339,8 @@
                 initialGreeting.textContent = `Hello, student of ${universityName}.`;
                 greetingHeader.textContent = universityName;
             } else {
-                 initialGreeting.textContent = `Hello, student.`;
-                 greetingHeader.textContent = `AI Helper`;
+                initialGreeting.textContent = `Hello, student.`;
+                greetingHeader.textContent = `AI Helper`;
             }
 
             loadChatHistory();
@@ -349,7 +364,7 @@
                 option.textContent = uni.name;
                 universitySelect.appendChild(option);
             });
-            
+
             tomSelect = new TomSelect(universitySelect, {
                 create: false,
                 sortField: {
@@ -393,17 +408,17 @@
             const errorEl = document.getElementById('signup-error');
             errorEl.classList.add('hidden');
             tomSelect.control.classList.remove('invalid');
-            
+
             if (!universityId) {
-                 errorEl.textContent = 'Пожалуйста, выберите университет.';
-                 errorEl.classList.remove('hidden');
-                 tomSelect.control.classList.add('invalid');
-                 return;
+                errorEl.textContent = 'Пожалуйста, выберите университет.';
+                errorEl.classList.remove('hidden');
+                tomSelect.control.classList.add('invalid');
+                return;
             }
 
             // Sign up with university_id in metadata
-            const { data, error } = await db.auth.signUp({ 
-                email, 
+            const { data, error } = await db.auth.signUp({
+                email,
                 password,
                 options: {
                     data: {
@@ -447,7 +462,7 @@
             chats.forEach(chat => {
                 const chatItem = document.createElement('div');
                 chatItem.className = `flex items-center justify-between p-3 my-1 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors cursor-pointer ${chat.id === activeChatId ? 'bg-indigo-200 dark:bg-indigo-800' : ''}`;
-                
+
                 const chatLink = document.createElement('a');
                 chatLink.href = `#${chat.id}`;
                 chatLink.className = `truncate flex-1 ${chat.id === activeChatId ? 'font-semibold' : ''}`;
@@ -460,7 +475,7 @@
                     e.stopPropagation();
                     e.preventDefault();
                     if (!confirm('Вы уверены, что хотите удалить этот чат?')) return;
-                    
+
                     const { error } = await db.from('chats').delete().eq('id', chat.id);
                     if (error) {
                         console.error('Ошибка удаления чата:', error);
@@ -485,7 +500,7 @@
             }
 
             activeChatId = chatId;
-            
+
             // Clear previous messages, preserving the typing indicator
             while (chatMessagesContainer.firstChild && chatMessagesContainer.firstChild !== typingIndicator) {
                 chatMessagesContainer.removeChild(chatMessagesContainer.firstChild);
@@ -494,33 +509,37 @@
             if (chatId) {
                 initialView.classList.add('hidden');
                 chatMessagesContainer.classList.remove('hidden');
-                
+
                 const { data: chat, error } = await db.from('chats').select('messages').eq('id', chatId).single();
                 if (error) { console.error('Ошибка загрузки чата:', error); return; }
 
                 if (chat.messages) {
                     chat.messages.forEach(msg => addMessageToUI(msg.sender, msg.text));
                 }
-                
+
                 chatSubscription = db.channel(`chat_${chatId}`)
                     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chats', filter: `id=eq.${chatId}` }, payload => {
-                        // When a change is detected, simply clear the chat and re-render with the new data.
-                        // This is a robust way to ensure the UI is always in sync with the DB.
-                        while (chatMessagesContainer.firstChild && chatMessagesContainer.firstChild !== typingIndicator) {
-                            chatMessagesContainer.removeChild(chatMessagesContainer.firstChild);
-                        }
-                        const updatedMessages = payload.new.messages;
-                        if (updatedMessages) {
-                            updatedMessages.forEach(msg => addMessageToUI(msg.sender, msg.text));
-                        }
-                    }).subscribe();
+                        const updated = payload.new.messages || [];
+                        const existing = Array.from(chatMessagesContainer.querySelectorAll('.message-wrapper'))
+                            .map(m => m.dataset.index)
+                            .filter(i => i !== undefined);
+
+                        // добавляем только новые по индексу
+                        updated.forEach((msg, i) => {
+                            if (!existing.includes(String(i))) {
+                                addMessageToUI(msg.sender, msg.text, i);
+                            }
+                        });
+                    })
+
+
             } else {
-                 initialView.classList.remove('hidden');
-                 chatMessagesContainer.classList.add('hidden');
+                initialView.classList.remove('hidden');
+                chatMessagesContainer.classList.add('hidden');
             }
             loadChatHistory();
         };
-        
+
         newChatBtn.addEventListener('click', () => { window.location.hash = ''; });
 
         const handleSendMessage = async () => {
@@ -545,7 +564,7 @@
                         messages: [userMessage]
                     }).select('id, messages').single();
                     if (error) throw error;
-                    
+
                     currentChatId = data.id;
                     existingMessages = data.messages;
                     window.location.hash = currentChatId;
@@ -553,15 +572,15 @@
                     // Fetch latest messages to append to
                     const { data: chatData, error: fetchError } = await db.from('chats').select('messages').eq('id', currentChatId).single();
                     if (fetchError) throw fetchError;
-                    
+
                     existingMessages = chatData.messages || [];
-                    
+
                     // Update DB with user message first
                     const updatedUserMessages = [...existingMessages, userMessage];
                     const { error: updateError } = await db.from('chats').update({ messages: updatedUserMessages }).eq('id', currentChatId);
                     if (updateError) throw updateError;
                 }
-                
+
                 // --- AI Response Simulation ---
                 setTimeout(() => {
                     const aiResponse = { sender: 'ai', text: "AI response" };
@@ -571,11 +590,11 @@
                     // Update DB in the background with AI message
                     const finalMessages = [...existingMessages, userMessage, aiResponse];
                     db.from('chats')
-                      .update({ messages: finalMessages })
-                      .eq('id', currentChatId)
-                      .then(({ error }) => {
-                        if (error) console.error('Error saving AI response:', error);
-                      });
+                        .update({ messages: finalMessages })
+                        .eq('id', currentChatId)
+                        .then(({ error }) => {
+                            if (error) console.error('Error saving AI response:', error);
+                        });
                 }, 500);
 
             } catch (err) {
@@ -589,16 +608,19 @@
         messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !sendBtn.disabled) handleSendMessage(); });
         messageInput.addEventListener('input', updateSendButton);
 
-        const addMessageToUI = (sender, text) => {
+        const addMessageToUI = (sender, text, index = null) => {
             const messageWrapper = document.createElement('div');
+            if (index !== null) messageWrapper.dataset.index = index;
             messageWrapper.className = `flex mb-4 message-wrapper ${sender === 'user' ? 'justify-end' : 'justify-start'}`;
             const messageBubble = document.createElement('div');
-            messageBubble.className = `max-w-xs lg:max-w-md p-3 rounded-2xl ${sender === 'user' ? 'bg-indigo-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100'}`;
+            messageBubble.className = `max-w-xs lg:max-w-md p-3 rounded-2xl ${sender === 'user' ? 'bg-indigo-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                }`;
             messageBubble.textContent = text;
             messageWrapper.appendChild(messageBubble);
-            typingIndicator.before(messageWrapper); // Insert before the typing indicator
+            typingIndicator.before(messageWrapper);
             chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
         };
+
 
         const handleUrlChange = () => {
             if (currentUser) {
@@ -624,4 +646,3 @@
 </body>
 
 </html>
-
