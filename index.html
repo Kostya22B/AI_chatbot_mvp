@@ -631,51 +631,54 @@
         window.addEventListener('hashchange', handleUrlChange);
 
         // --- init: явная проверка сессии при загрузке ---
-        let chatInitialized = false;
-
+        // Убираем сложные флаги. Делаем явную инициализацию + простой listener.
         const initAuth = async () => {
             try {
-                // Получаем текущую сессию сразу
                 const { data } = await db.auth.getSession();
                 const session = data?.session ?? null;
 
                 if (session && session.user) {
                     currentUser = session.user;
-                    chatInitialized = true;
+                    // покроем случай, когда hash уже установлен (например после reload)
                     await showChatScreen(currentUser);
-                    // корректно обработать хэш (если был)
+                    // handleUrlChange внутри showChatScreen может вызываться раньше, поэтому вызываем отдельно
                     handleUrlChange();
                 } else {
-                    // нет сессии — показать экран аутентификации
                     currentUser = null;
-                    chatInitialized = false;
                     showAuthScreen();
                 }
             } catch (err) {
                 console.error('initAuth error', err);
+                currentUser = null;
                 showAuthScreen();
             }
         };
 
-        // запустить инициализацию немедленно
         initAuth();
 
-
+        // Подписка только для реакций на изменения аутентификации
         db.auth.onAuthStateChange(async (event, session) => {
             if (session && session.user) {
+                // вошли
                 currentUser = session.user;
-                if (!chatInitialized) {
-                    chatInitialized = true;
+                userEmailDisplay.textContent = currentUser.email || '';
+                // если сейчас не показан экран чата — показать его
+                if (chatScreen.style.display === 'none' || chatMessagesContainer.classList.contains('hidden')) {
                     await showChatScreen(currentUser);
                     handleUrlChange();
                 } else {
-                    // если уже инициализированы — просто обновить UI
-                    userEmailDisplay.textContent = session.user.email;
+                    // просто обновим список чатов
                     loadChatHistory();
                 }
             } else {
-                chatInitialized = false;
+                // вышли
                 currentUser = null;
+                // сбрасываем активный чат и отписываемся
+                activeChatId = null;
+                if (chatSubscription) {
+                    try { await db.removeChannel(chatSubscription); } catch (e) { /* ignore */ }
+                    chatSubscription = null;
+                }
                 showAuthScreen();
             }
         });
