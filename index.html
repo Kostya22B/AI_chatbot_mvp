@@ -495,50 +495,49 @@
 
         const setActiveChat = async (chatId) => {
             if (chatSubscription) {
-                chatSubscription.unsubscribe();
+                await db.removeChannel(chatSubscription);
                 chatSubscription = null;
             }
 
             activeChatId = chatId;
 
-            // Clear previous messages, preserving the typing indicator
-            while (chatMessagesContainer.firstChild && chatMessagesContainer.firstChild !== typingIndicator) {
-                chatMessagesContainer.removeChild(chatMessagesContainer.firstChild);
-            }
+            // очистка сообщений
+            chatMessagesContainer.querySelectorAll('.message-wrapper').forEach(m => m.remove());
 
             if (chatId) {
                 initialView.classList.add('hidden');
                 chatMessagesContainer.classList.remove('hidden');
 
-                const { data: chat, error } = await db.from('chats').select('messages').eq('id', chatId).single();
-                if (error) { console.error('Ошибка загрузки чата:', error); return; }
+                const { data: chat, error } = await db
+                    .from('chats')
+                    .select('messages')
+                    .eq('id', chatId)
+                    .single();
 
-                if (chat.messages) {
-                    chat.messages.forEach(msg => addMessageToUI(msg.sender, msg.text));
+                if (!error && chat.messages) {
+                    chat.messages.forEach((msg, i) => addMessageToUI(msg.sender, msg.text, i));
                 }
 
-                chatSubscription = db.channel(`chat_${chatId}`)
+                chatSubscription = db
+                    .channel(`chat_${chatId}`)
                     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chats', filter: `id=eq.${chatId}` }, payload => {
                         const updated = payload.new.messages || [];
-                        const existing = Array.from(chatMessagesContainer.querySelectorAll('.message-wrapper'))
-                            .map(m => m.dataset.index)
-                            .filter(i => i !== undefined);
-
-                        // добавляем только новые по индексу
-                        updated.forEach((msg, i) => {
-                            if (!existing.includes(String(i))) {
-                                addMessageToUI(msg.sender, msg.text, i);
-                            }
-                        });
+                        const currentCount = chatMessagesContainer.querySelectorAll('.message-wrapper').length;
+                        // добавляем только новые
+                        for (let i = currentCount; i < updated.length; i++) {
+                            const msg = updated[i];
+                            addMessageToUI(msg.sender, msg.text, i);
+                        }
                     })
-
-
+                    .subscribe();
             } else {
                 initialView.classList.remove('hidden');
                 chatMessagesContainer.classList.add('hidden');
             }
-            loadChatHistory();
-        };
+
+            await loadChatHistory();
+        }
+
 
         newChatBtn.addEventListener('click', () => { window.location.hash = ''; });
 
