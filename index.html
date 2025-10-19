@@ -315,13 +315,12 @@
 
         let currentUser = null;
         let activeChatId = null;
-        let chatSubscription = null;
         let tomSelect = null;
-        let isAppInitialized = false;
 
         // --- Управление UI ---
         const showAuthScreen = () => {
-            isAppInitialized = false;
+            currentUser = null;
+            activeChatId = null;
             authScreen.style.display = 'flex';
             chatScreen.style.display = 'none';
             loadUniversities();
@@ -332,7 +331,6 @@
             chatScreen.style.display = 'flex';
             userEmailDisplay.textContent = user.email;
 
-            // Fetch profile to get university name
             const { data: profile, error } = await db.from('profiles').select('universities(name)').eq('id', user.id).single();
             if (error) {
                 console.error("Could not fetch user's university", error);
@@ -359,7 +357,7 @@
                 tomSelect.destroy();
             }
 
-            universitySelect.innerHTML = '<option value="">Выберите университет...</option>'; // Clear previous and add placeholder
+            universitySelect.innerHTML = '<option value="">Выберите университет...</option>';
             data.forEach(uni => {
                 const option = document.createElement('option');
                 option.value = uni.id;
@@ -418,7 +416,6 @@
                 return;
             }
 
-            // Sign up with university_id in metadata
             const { data, error } = await db.auth.signUp({
                 email,
                 password,
@@ -434,17 +431,16 @@
                 errorEl.classList.remove('hidden');
             } else {
                 alert('Регистрация прошла успешно! Пожалуйста, проверьте свою почту для подтверждения.');
-                // Switch back to login form after successful signup
                 signupForm.classList.add('hidden');
                 loginForm.classList.remove('hidden');
             }
         });
 
         logoutBtn.addEventListener('click', async () => {
-            isAppInitialized = false;
             await db.auth.signOut();
             window.location.hash = '';
         });
+
         showSignup.addEventListener('click', (e) => { e.preventDefault(); loginForm.classList.add('hidden'); signupForm.classList.remove('hidden'); });
         showLogin.addEventListener('click', (e) => { e.preventDefault(); signupForm.classList.add('hidden'); loginForm.classList.remove('hidden'); });
         menuToggle.addEventListener('click', toggleSidebar);
@@ -485,9 +481,9 @@
                         console.error('Ошибка удаления чата:', error);
                     } else {
                         if (chat.id === activeChatId) {
-                            window.location.hash = ''; // Go back to initial screen
+                            window.location.hash = '';
                         }
-                        loadChatHistory(); // Refresh list
+                        loadChatHistory();
                     }
                 });
 
@@ -499,19 +495,13 @@
 
         const setActiveChat = async (chatId) => {
             activeChatId = chatId;
-
-            // Clear previous messages
             chatMessagesContainer.querySelectorAll('.message-wrapper').forEach(m => m.remove());
 
             if (chatId) {
                 initialView.classList.add('hidden');
                 chatMessagesContainer.classList.remove('hidden');
 
-                const { data: chat, error } = await db
-                    .from('chats')
-                    .select('messages')
-                    .eq('id', chatId)
-                    .single();
+                const { data: chat, error } = await db.from('chats').select('messages').eq('id', chatId).single();
 
                 if (error) {
                     console.error("Failed to load chat messages", error);
@@ -525,7 +515,6 @@
                 chatMessagesContainer.classList.add('hidden');
             }
 
-            // Update active chat highlight
             chatHistoryContainer.querySelectorAll('div[data-chat-id]').forEach(item => {
                 const itemChatId = item.dataset.chatId;
                 const link = item.querySelector('a');
@@ -570,9 +559,9 @@
                     
                     if (error) throw error;
                     chatId = data.id;
-                    window.location.hash = chatId; 
-                    await loadChatHistory(); 
-                    setActiveChat(chatId); 
+                    window.location.hash = chatId;
+                    await loadChatHistory();
+                    setActiveChat(chatId);
 
                 } else {
                     const { data: chatData, error: fetchError } = await db.from('chats').select('messages').eq('id', chatId).single();
@@ -615,18 +604,23 @@
         window.addEventListener('hashchange', handleUrlChange);
 
         const initializeApp = async (user) => {
-            if (isAppInitialized) return;
-            isAppInitialized = true;
-
+            if (currentUser && currentUser.id === user.id) return;
             currentUser = user;
-            await showChatScreen(currentUser);
+
+            await showChatScreen(user);
             await loadChatHistory();
             handleUrlChange();
         };
 
         db.auth.onAuthStateChange(async (event, session) => {
-            if (event === 'SIGNED_IN' || (event === 'INITIAL_SESSION' && session)) {
+            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
                 await initializeApp(session.user);
+            } else if (event === 'INITIAL_SESSION') {
+                if (session) {
+                    await initializeApp(session.user);
+                } else {
+                    showAuthScreen();
+                }
             } else if (event === 'SIGNED_OUT') {
                 showAuthScreen();
             }
@@ -635,3 +629,4 @@
 </body>
 
 </html>
+
