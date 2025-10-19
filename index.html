@@ -89,14 +89,12 @@
 
     <div id="app" class="relative flex h-screen w-screen antialiased overflow-hidden">
 
-        <!-- Auth Screen -->
         <div id="auth-screen" class="w-full h-full flex items-center justify-center p-4 bg-gray-200 dark:bg-gray-800">
             <div
                 class="w-full max-w-md m-auto bg-white dark:bg-gray-900 rounded-2xl shadow-xl p-8 border dark:border-gray-700">
                 <h1 class="text-3xl font-bold text-center mb-6 text-indigo-600 dark:text-indigo-400">University AI
                     Helper</h1>
                 <div id="auth-form-container">
-                    <!-- Login Form -->
                     <form id="login-form" class="space-y-6">
                         <h2 class="text-2xl font-semibold text-center text-gray-700 dark:text-gray-200">Вход</h2>
                         <div>
@@ -118,7 +116,6 @@
                                 class="font-semibold text-indigo-500 hover:underline">Зарегистрироваться</a></p>
                     </form>
 
-                    <!-- Signup Form -->
                     <form id="signup-form" class="space-y-6 hidden">
                         <h2 class="text-2xl font-semibold text-center text-gray-700 dark:text-gray-200">Регистрация</h2>
                         <div>
@@ -137,8 +134,7 @@
                             <label for="university-select"
                                 class="text-sm font-medium text-gray-600 dark:text-gray-400">Университет</label>
                             <select id="university-select" placeholder="Выберите университет..." class="mt-1">
-                                <!-- Options will be populated from DB -->
-                            </select>
+                                </select>
                         </div>
                         <p id="signup-error" class="text-red-500 text-sm hidden"></p>
                         <button type="submit"
@@ -150,9 +146,7 @@
             </div>
         </div>
 
-        <!-- Chat Screen -->
         <div id="chat-screen" class="hidden w-full h-full md:flex">
-            <!-- Sidebar -->
             <div id="sidebar"
                 class="sidebar absolute md:relative z-20 w-80 md:w-1/4 bg-gray-200 dark:bg-gray-800 p-4 flex flex-col h-full border-r dark:border-gray-700 sidebar-closed md:transform-none">
                 <div class="flex-shrink-0 mb-4">
@@ -167,8 +161,7 @@
                     </button>
                 </div>
                 <div id="chat-history" class="flex-grow overflow-y-auto pr-2 space-y-2 chat-history">
-                    <!-- Chat history items will be populated here -->
-                </div>
+                    </div>
                 <div class="flex-shrink-0 mt-4 border-t border-gray-300 dark:border-gray-600 pt-4 space-y-2">
                     <p id="user-email" class="text-sm text-center truncate text-gray-600 dark:text-gray-400"></p>
                     <button id="logout-btn"
@@ -184,7 +177,6 @@
                 </div>
             </div>
 
-            <!-- Main Chat Window -->
             <div class="flex-1 flex flex-col bg-white dark:bg-gray-900">
                 <header
                     class="flex-shrink-0 p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
@@ -218,7 +210,6 @@
 
                     <div id="chat-messages-container"
                         class="hidden flex-1 overflow-y-auto chat-container pr-2 space-y-4">
-                        <!-- Messages will appear here -->
                         <div id="typing-indicator" class="hidden flex mb-4 justify-start">
                             <div class="max-w-xs lg:max-w-md p-3 rounded-2xl bg-gray-200 dark:bg-gray-700">
                                 <div class="flex items-center space-x-1">
@@ -334,13 +325,15 @@
             const { data: profile, error } = await db.from('profiles').select('universities(name)').eq('id', user.id).single();
             if (error) {
                 console.error("Could not fetch user's university", error);
+                initialGreeting.textContent = `Hello, student.`;
+                greetingHeader.textContent = `AI Helper`;
             } else if (profile && profile.universities) {
                 const universityName = profile.universities.name;
                 initialGreeting.textContent = `Hello, student of ${universityName}.`;
                 greetingHeader.textContent = universityName;
             } else {
-                initialGreeting.textContent = `Hello, student.`;
-                greetingHeader.textContent = `AI Helper`;
+                 initialGreeting.textContent = `Hello, student.`;
+                 greetingHeader.textContent = `AI Helper`;
             }
 
             loadChatHistory();
@@ -630,60 +623,39 @@
 
         window.addEventListener('hashchange', handleUrlChange);
 
-        // --- init: явная проверка сессии при загрузке ---
-        // Убираем сложные флаги. Делаем явную инициализацию + простой listener.
-        const initAuth = async () => {
-            try {
-                const { data } = await db.auth.getSession();
-                const session = data?.session ?? null;
-
-                if (session && session.user) {
-                    currentUser = session.user;
-                    // покроем случай, когда hash уже установлен (например после reload)
-                    await showChatScreen(currentUser);
-                    // handleUrlChange внутри showChatScreen может вызываться раньше, поэтому вызываем отдельно
-                    handleUrlChange();
-                } else {
-                    currentUser = null;
-                    showAuthScreen();
-                }
-            } catch (err) {
-                console.error('initAuth error', err);
-                currentUser = null;
-                showAuthScreen();
-            }
-        };
-
-        initAuth();
-
-        // Подписка только для реакций на изменения аутентификации
+        // --- init: ИСПРАВЛЕННЫЙ ЕДИНЫЙ обработчик ---
+        // Убираем ручной initAuth() и полагаемся только на onAuthStateChange.
+        // Он сработает при загрузке страницы (INITIAL_SESSION/TOKEN_REFRESHED)
+        // и при входе/выходе (SIGNED_IN/SIGNED_OUT).
+        
         db.auth.onAuthStateChange(async (event, session) => {
+            
             if (session && session.user) {
-                // вошли
+                // Это срабатывает и при входе, и при обновлении страницы с валидной сессией.
                 currentUser = session.user;
-                userEmailDisplay.textContent = currentUser.email || '';
-                // если сейчас не показан экран чата — показать его
-                if (chatScreen.style.display === 'none' || chatMessagesContainer.classList.contains('hidden')) {
-                    await showChatScreen(currentUser);
-                    handleUrlChange();
-                } else {
-                    // просто обновим список чатов
-                    loadChatHistory();
-                }
+                
+                // Показываем экран чата и загружаем профиль/университет.
+                // Эта функция УЖЕ содержит loadChatHistory()
+                await showChatScreen(currentUser); 
+                
+                // Загружаем нужный чат из URL (хеша).
+                // Эта функция также вызовет loadChatHistory()
+                handleUrlChange();
+
             } else {
-                // вышли
+                // Это срабатывает при выходе или если сессия не найдена/невалидна.
                 currentUser = null;
-                // сбрасываем активный чат и отписываемся
                 activeChatId = null;
+                
+                // Отписываемся от любых каналов
                 if (chatSubscription) {
                     try { await db.removeChannel(chatSubscription); } catch (e) { /* ignore */ }
                     chatSubscription = null;
                 }
+                // Показываем экран входа.
                 showAuthScreen();
             }
         });
-
-
 
     </script>
 </body>
