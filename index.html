@@ -602,25 +602,25 @@
         };
 
         window.addEventListener('hashchange', handleUrlChange);
-
+        
+        // --- ФИНАЛЬНЫЙ ОБРАБОТЧИК АУТЕНТИФИКАЦИИ ---
         const initializeApp = async (user) => {
-            if (currentUser && currentUser.id === user.id) return;
+            // Предотвращаем повторный запуск, если пользователь уже инициализирован
+            if (currentUser && currentUser.id === user.id) {
+                return;
+            }
             currentUser = user;
 
+            // Выполняем все действия по порядку
             await showChatScreen(user);
             await loadChatHistory();
             handleUrlChange();
         };
 
         db.auth.onAuthStateChange(async (event, session) => {
-            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || (event === 'INITIAL_SESSION' && session)) {
+                // Эти события говорят, что у нас есть валидная сессия с обновленным токеном
                 await initializeApp(session.user);
-            } else if (event === 'INITIAL_SESSION') {
-                if (session) {
-                    await initializeApp(session.user);
-                } else {
-                    showAuthScreen();
-                }
             } else if (event === 'SIGNED_OUT') {
                 showAuthScreen();
             }
