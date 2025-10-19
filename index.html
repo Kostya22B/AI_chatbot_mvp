@@ -630,20 +630,56 @@
 
         window.addEventListener('hashchange', handleUrlChange);
 
+        // --- init: явная проверка сессии при загрузке ---
         let chatInitialized = false;
 
+        const initAuth = async () => {
+            try {
+                // Получаем текущую сессию сразу
+                const { data } = await db.auth.getSession();
+                const session = data?.session ?? null;
+
+                if (session && session.user) {
+                    currentUser = session.user;
+                    chatInitialized = true;
+                    await showChatScreen(currentUser);
+                    // корректно обработать хэш (если был)
+                    handleUrlChange();
+                } else {
+                    // нет сессии — показать экран аутентификации
+                    currentUser = null;
+                    chatInitialized = false;
+                    showAuthScreen();
+                }
+            } catch (err) {
+                console.error('initAuth error', err);
+                showAuthScreen();
+            }
+        };
+
+        // запустить инициализацию немедленно
+        initAuth();
+
+
         db.auth.onAuthStateChange(async (event, session) => {
-            if (session && !chatInitialized) {
-                chatInitialized = true;
+            if (session && session.user) {
                 currentUser = session.user;
-                await showChatScreen(currentUser);
-                handleUrlChange();
-            } else if (!session) {
+                if (!chatInitialized) {
+                    chatInitialized = true;
+                    await showChatScreen(currentUser);
+                    handleUrlChange();
+                } else {
+                    // если уже инициализированы — просто обновить UI
+                    userEmailDisplay.textContent = session.user.email;
+                    loadChatHistory();
+                }
+            } else {
                 chatInitialized = false;
                 currentUser = null;
                 showAuthScreen();
             }
         });
+
 
 
     </script>
