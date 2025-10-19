@@ -67,6 +67,9 @@
          .dark .ts-dropdown .option:hover {
             background-color: #374151; /* dark:bg-gray-600 */
         }
+        .ts-control.invalid {
+            border-color: #ef4444; /* border-red-500 */
+        }
     </style>
 </head>
 
@@ -116,7 +119,7 @@
                         </div>
                         <div>
                             <label for="university-select" class="text-sm font-medium text-gray-600 dark:text-gray-400">Университет</label>
-                            <select id="university-select" placeholder="Выберите университет..." required class="mt-1">
+                            <select id="university-select" placeholder="Выберите университет..." class="mt-1">
                                 <!-- Options will be populated from DB -->
                             </select>
                         </div>
@@ -249,6 +252,7 @@
         // =================================================================================
         const SUPABASE_URL = 'https://mmgcxilliiwuskuiiwqf.supabase.co'; // Замените на URL вашего проекта
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1tZ2N4aWxsaWl3dXNrdWlpd3FmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA1OTQ5MzMsImV4cCI6MjA3NjE3MDkzM30.JIUMJzkV08K_ziQzVSyaqvUF_REZpGOAlyH7_C8tSvw'; // Замените на ваш anon public ключ
+        // =================================================================================
         
         const authScreen = document.getElementById('auth-screen');
 
@@ -337,7 +341,7 @@
                 tomSelect.destroy();
             }
 
-            universitySelect.innerHTML = ''; // Clear previous options
+            universitySelect.innerHTML = '<option value="">Выберите университет...</option>'; // Clear previous and add placeholder
             data.forEach(uni => {
                 const option = document.createElement('option');
                 option.value = uni.id;
@@ -387,10 +391,12 @@
             const universityId = universitySelect.value;
             const errorEl = document.getElementById('signup-error');
             errorEl.classList.add('hidden');
+            tomSelect.control.classList.remove('invalid');
             
             if (!universityId) {
                  errorEl.textContent = 'Пожалуйста, выберите университет.';
                  errorEl.classList.remove('hidden');
+                 tomSelect.control.classList.add('invalid');
                  return;
             }
 
@@ -466,17 +472,14 @@
                     chat.messages.forEach(msg => addMessageToUI(msg.sender, msg.text));
                 }
                 
+                // Subscription now primarily for real-time sync across devices, not for showing AI response.
                 chatSubscription = db.channel(`chat_${chatId}`)
                     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chats', filter: `id=eq.${chatId}` }, payload => {
                         const updatedMessages = payload.new.messages;
-                        if (!updatedMessages) return;
-                        const oldMessagesCount = chatMessagesContainer.querySelectorAll('.message-wrapper').length;
-                        if (updatedMessages.length > oldMessagesCount) {
-                            const lastMessage = updatedMessages[updatedMessages.length - 1];
-                            if(lastMessage.sender === 'ai') {
-                                hideTypingIndicator();
-                                addMessageToUI(lastMessage.sender, lastMessage.text);
-                            }
+                        const currentMessagesCount = chatMessagesContainer.querySelectorAll('.message-wrapper').length;
+                        // Simple refresh if message count is different to avoid complex logic
+                        if (updatedMessages && updatedMessages.length !== currentMessagesCount) {
+                            setActiveChat(chatId);
                         }
                     }).subscribe();
             } else {
@@ -500,9 +503,10 @@
 
             try {
                 let currentChatId = activeChatId;
-                let currentMessages = [];
+                let existingMessages = [];
 
                 if (!currentChatId) {
+                    // Create new chat
                     const { data, error } = await db.from('chats').insert({
                         user_id: currentUser.id,
                         title: text.substring(0, 40),
@@ -511,29 +515,37 @@
                     if (error) throw error;
                     
                     currentChatId = data.id;
-                    currentMessages = data.messages;
+                    existingMessages = data.messages;
                     window.location.hash = currentChatId;
                 } else {
+                    // Fetch latest messages to append to
                     const { data: chatData, error: fetchError } = await db.from('chats').select('messages').eq('id', currentChatId).single();
                     if (fetchError) throw fetchError;
-                    currentMessages = [...(chatData.messages || []), userMessage];
                     
-                    const { error: updateError } = await db.from('chats').update({ messages: currentMessages }).eq('id', currentChatId);
+                    existingMessages = chatData.messages || [];
+                    
+                    // Update DB with user message first
+                    const updatedUserMessages = [...existingMessages, userMessage];
+                    const { error: updateError } = await db.from('chats').update({ messages: updatedUserMessages }).eq('id', currentChatId);
                     if (updateError) throw updateError;
                 }
                 
-                setTimeout(async () => {
-                    try {
-                        const aiResponse = { sender: 'ai', text: "AI response" };
-                        const finalMessages = [...currentMessages, aiResponse];
-                        const { error } = await db.from('chats').update({ messages: finalMessages }).eq('id', currentChatId);
-                        if (error) throw error;
-                    } catch(err) {
-                        console.error('Ошибка при получении ответа AI:', err);
-                        hideTypingIndicator();
-                        addMessageToUI('ai', 'Извините, произошла ошибка.');
-                    }
-                }, 800);
+                // --- AI Response Simulation ---
+                // This now happens immediately after user message is persisted
+                setTimeout(() => {
+                    const aiResponse = { sender: 'ai', text: "AI response" };
+                    hideTypingIndicator();
+                    addMessageToUI(aiResponse.sender, aiResponse.text); // Optimistic UI update
+
+                    // Update DB in the background with AI message
+                    const finalMessages = [...existingMessages, userMessage, aiResponse];
+                    db.from('chats')
+                      .update({ messages: finalMessages })
+                      .eq('id', currentChatId)
+                      .then(({ error }) => {
+                        if (error) console.error('Error saving AI response:', error);
+                      });
+                }, 500); // Reduced delay
 
             } catch (err) {
                 console.error('Ошибка отправки сообщения:', err);
@@ -581,4 +593,5 @@
 </body>
 
 </html>
+
 
