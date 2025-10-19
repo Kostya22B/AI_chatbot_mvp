@@ -89,12 +89,14 @@
 
     <div id="app" class="relative flex h-screen w-screen antialiased overflow-hidden">
 
+        <!-- Auth Screen -->
         <div id="auth-screen" class="w-full h-full flex items-center justify-center p-4 bg-gray-200 dark:bg-gray-800">
             <div
                 class="w-full max-w-md m-auto bg-white dark:bg-gray-900 rounded-2xl shadow-xl p-8 border dark:border-gray-700">
                 <h1 class="text-3xl font-bold text-center mb-6 text-indigo-600 dark:text-indigo-400">University AI
                     Helper</h1>
                 <div id="auth-form-container">
+                    <!-- Login Form -->
                     <form id="login-form" class="space-y-6">
                         <h2 class="text-2xl font-semibold text-center text-gray-700 dark:text-gray-200">Вход</h2>
                         <div>
@@ -116,6 +118,7 @@
                                 class="font-semibold text-indigo-500 hover:underline">Зарегистрироваться</a></p>
                     </form>
 
+                    <!-- Signup Form -->
                     <form id="signup-form" class="space-y-6 hidden">
                         <h2 class="text-2xl font-semibold text-center text-gray-700 dark:text-gray-200">Регистрация</h2>
                         <div>
@@ -134,7 +137,8 @@
                             <label for="university-select"
                                 class="text-sm font-medium text-gray-600 dark:text-gray-400">Университет</label>
                             <select id="university-select" placeholder="Выберите университет..." class="mt-1">
-                                </select>
+                                <!-- Options will be populated from DB -->
+                            </select>
                         </div>
                         <p id="signup-error" class="text-red-500 text-sm hidden"></p>
                         <button type="submit"
@@ -146,7 +150,9 @@
             </div>
         </div>
 
+        <!-- Chat Screen -->
         <div id="chat-screen" class="hidden w-full h-full md:flex">
+            <!-- Sidebar -->
             <div id="sidebar"
                 class="sidebar absolute md:relative z-20 w-80 md:w-1/4 bg-gray-200 dark:bg-gray-800 p-4 flex flex-col h-full border-r dark:border-gray-700 sidebar-closed md:transform-none">
                 <div class="flex-shrink-0 mb-4">
@@ -161,7 +167,8 @@
                     </button>
                 </div>
                 <div id="chat-history" class="flex-grow overflow-y-auto pr-2 space-y-2 chat-history">
-                    </div>
+                    <!-- Chat history items will be populated here -->
+                </div>
                 <div class="flex-shrink-0 mt-4 border-t border-gray-300 dark:border-gray-600 pt-4 space-y-2">
                     <p id="user-email" class="text-sm text-center truncate text-gray-600 dark:text-gray-400"></p>
                     <button id="logout-btn"
@@ -177,6 +184,7 @@
                 </div>
             </div>
 
+            <!-- Main Chat Window -->
             <div class="flex-1 flex flex-col bg-white dark:bg-gray-900">
                 <header
                     class="flex-shrink-0 p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
@@ -210,6 +218,7 @@
 
                     <div id="chat-messages-container"
                         class="hidden flex-1 overflow-y-auto chat-container pr-2 space-y-4">
+                        <!-- Messages will appear here -->
                         <div id="typing-indicator" class="hidden flex mb-4 justify-start">
                             <div class="max-w-xs lg:max-w-md p-3 rounded-2xl bg-gray-200 dark:bg-gray-700">
                                 <div class="flex items-center space-x-1">
@@ -308,9 +317,11 @@
         let activeChatId = null;
         let chatSubscription = null;
         let tomSelect = null;
+        let isAppInitialized = false;
 
         // --- Управление UI ---
         const showAuthScreen = () => {
+            isAppInitialized = false;
             authScreen.style.display = 'flex';
             chatScreen.style.display = 'none';
             loadUniversities();
@@ -335,9 +346,6 @@
                  initialGreeting.textContent = `Hello, student.`;
                  greetingHeader.textContent = `AI Helper`;
             }
-
-            // ИСПРАВЛЕНИЕ: loadChatHistory() больше не вызывается здесь,
-            // он будет вызван в 'initializeApp' после этой функции.
         };
 
         const loadUniversities = async () => {
@@ -433,6 +441,7 @@
         });
 
         logoutBtn.addEventListener('click', async () => {
+            isAppInitialized = false;
             await db.auth.signOut();
             window.location.hash = '';
         });
@@ -455,8 +464,7 @@
             chatHistoryContainer.innerHTML = '';
             chats.forEach(chat => {
                 const chatItem = document.createElement('div');
-                // ИСПРАВЛЕНИЕ: Добавляем data-chat-id для легкого поиска
-                chatItem.dataset.chatId = chat.id; 
+                chatItem.dataset.chatId = chat.id;
                 chatItem.className = `flex items-center justify-between p-3 my-1 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors cursor-pointer`;
                 
                 const chatLink = document.createElement('a');
@@ -490,10 +498,6 @@
         };
 
         const setActiveChat = async (chatId) => {
-            if (chatSubscription) {
-                await db.removeChannel(chatSubscription);
-                chatSubscription = null;
-            }
             activeChatId = chatId;
 
             // Clear previous messages
@@ -516,16 +520,12 @@
                 if (chat && chat.messages) {
                     chat.messages.forEach(msg => addMessageToUI(msg.sender, msg.text));
                 }
-                
-                // (Можно будет вернуть подписки позже, когда основная логика F5 исправлена)
-                
             } else {
                 initialView.classList.remove('hidden');
                 chatMessagesContainer.classList.add('hidden');
             }
 
-            // ИСПРАВЛЕНИЕ: loadChatHistory() здесь больше не вызывается.
-            // Вместо этого мы просто обновляем подсветку
+            // Update active chat highlight
             chatHistoryContainer.querySelectorAll('div[data-chat-id]').forEach(item => {
                 const itemChatId = item.dataset.chatId;
                 const link = item.querySelector('a');
@@ -546,44 +546,39 @@
             if (!text || !currentUser) return;
 
             const userMessage = { sender: 'user', text };
-            const aiResponse = { sender: 'ai', text: "AI response" }; // Mock response
+            const aiResponse = { sender: 'ai', text: "AI response" };
 
-            // 1. Оптимистичное обновление UI
             addMessageToUI(userMessage.sender, userMessage.text);
             showTypingIndicator();
             setTimeout(() => {
                 hideTypingIndicator();
                 addMessageToUI(aiResponse.sender, aiResponse.text);
-            }, 500); // Имитация "раздумий"
+            }, 500);
 
             messageInput.value = '';
             updateSendButton();
 
-            // 2. Обновление БД в фоновом режиме
             try {
                 let chatId = activeChatId;
-                let currentMessages = [];
 
                 if (!chatId) {
-                    // Создаем новый чат
                     const { data, error } = await db.from('chats').insert({
                         user_id: currentUser.id,
                         title: text.substring(0, 40),
-                        messages: [userMessage, aiResponse] // Сразу оба сообщения
+                        messages: [userMessage, aiResponse]
                     }).select('id').single();
                     
                     if (error) throw error;
                     chatId = data.id;
-                    window.location.hash = chatId; // Это вызовет hashchange, который вызовет setActiveChat
-                    await loadChatHistory(); // Перезагружаем список, чтобы увидеть новый чат
-                    setActiveChat(chatId); // Подсвечиваем новый чат
+                    window.location.hash = chatId; 
+                    await loadChatHistory(); 
+                    setActiveChat(chatId); 
 
                 } else {
-                    // Обновляем существующий
                     const { data: chatData, error: fetchError } = await db.from('chats').select('messages').eq('id', chatId).single();
                     if (fetchError) throw fetchError;
 
-                    currentMessages = chatData.messages || [];
+                    const currentMessages = chatData.messages || [];
                     const updatedMessages = [...currentMessages, userMessage, aiResponse];
                     
                     const { error: updateError } = await db.from('chats').update({ messages: updatedMessages }).eq('id', chatId);
@@ -591,7 +586,7 @@
                 }
             } catch (err) {
                 console.error('Ошибка отправки сообщения:', err);
-                addMessageToUI('ai', 'Ошибка сохранения... Пожалуйста, обновите страницу.');
+                addMessageToUI('ai', 'Ошибка сохранения...');
             }
         };
 
@@ -619,45 +614,23 @@
 
         window.addEventListener('hashchange', handleUrlChange);
 
-        // --- ГЛАВНАЯ ФУНКЦИЯ ИНИЦИАЛИЗАЦИИ ---
-        // Эта функция запускается ОДИН РАЗ, когда сессия становится валидной.
         const initializeApp = async (user) => {
-            if (currentUser && currentUser.id === user.id) {
-                // Предотвращаем повторный запуск, если событие сработало несколько раз
-                return;
-            }
+            if (isAppInitialized) return;
+            isAppInitialized = true;
+
             currentUser = user;
-
-            // 1. Показываем UI и загружаем профиль/университет
             await showChatScreen(currentUser);
-
-            // 2. Загружаем список чатов
             await loadChatHistory();
-
-            // 3. Загружаем активный чат из URL
             handleUrlChange();
         };
 
-        // --- ЕДИНЫЙ ОБРАБОТЧИК АУТЕНТИФИКАЦИИ ---
         db.auth.onAuthStateChange(async (event, session) => {
-            
-            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || (event === 'INITIAL_SESSION' && session)) {
-                // Эти события означают, что у нас есть ВАЛИДНАЯ сессия
+            if (event === 'SIGNED_IN' || (event === 'INITIAL_SESSION' && session)) {
                 await initializeApp(session.user);
-            
             } else if (event === 'SIGNED_OUT') {
-                // Пользователь вышел из системы
-                currentUser = null;
-                activeChatId = null;
-                if (chatSubscription) {
-                    try { await db.removeChannel(chatSubscription); } catch (e) {}
-                    chatSubscription = null;
-                }
-                window.location.hash = '';
                 showAuthScreen();
             }
         });
-
     </script>
 </body>
 
