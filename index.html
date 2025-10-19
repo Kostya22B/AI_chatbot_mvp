@@ -336,7 +336,8 @@
                  greetingHeader.textContent = `AI Helper`;
             }
 
-            loadChatHistory();
+            // ИСПРАВЛЕНИЕ: loadChatHistory() больше не вызывается здесь,
+            // он будет вызван в 'initializeApp' после этой функции.
         };
 
         const loadUniversities = async () => {
@@ -454,11 +455,13 @@
             chatHistoryContainer.innerHTML = '';
             chats.forEach(chat => {
                 const chatItem = document.createElement('div');
-                chatItem.className = `flex items-center justify-between p-3 my-1 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors cursor-pointer ${chat.id === activeChatId ? 'bg-indigo-200 dark:bg-indigo-800' : ''}`;
-
+                // ИСПРАВЛЕНИЕ: Добавляем data-chat-id для легкого поиска
+                chatItem.dataset.chatId = chat.id; 
+                chatItem.className = `flex items-center justify-between p-3 my-1 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors cursor-pointer`;
+                
                 const chatLink = document.createElement('a');
                 chatLink.href = `#${chat.id}`;
-                chatLink.className = `truncate flex-1 ${chat.id === activeChatId ? 'font-semibold' : ''}`;
+                chatLink.className = `truncate flex-1`;
                 chatLink.textContent = chat.title || 'Новый чат';
 
                 const delBtn = document.createElement('button');
@@ -491,10 +494,9 @@
                 await db.removeChannel(chatSubscription);
                 chatSubscription = null;
             }
-
             activeChatId = chatId;
 
-            // очистка сообщений
+            // Clear previous messages
             chatMessagesContainer.querySelectorAll('.message-wrapper').forEach(m => m.remove());
 
             if (chatId) {
@@ -507,30 +509,35 @@
                     .eq('id', chatId)
                     .single();
 
-                if (!error && chat.messages) {
-                    chat.messages.forEach((msg, i) => addMessageToUI(msg.sender, msg.text, i));
+                if (error) {
+                    console.error("Failed to load chat messages", error);
+                    return;
                 }
-
-                chatSubscription = db
-                    .channel(`chat_${chatId}`)
-                    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chats', filter: `id=eq.${chatId}` }, payload => {
-                        const updated = payload.new.messages || [];
-                        const currentCount = chatMessagesContainer.querySelectorAll('.message-wrapper').length;
-                        // добавляем только новые
-                        for (let i = currentCount; i < updated.length; i++) {
-                            const msg = updated[i];
-                            addMessageToUI(msg.sender, msg.text, i);
-                        }
-                    })
-                    .subscribe();
+                if (chat && chat.messages) {
+                    chat.messages.forEach(msg => addMessageToUI(msg.sender, msg.text));
+                }
+                
+                // (Можно будет вернуть подписки позже, когда основная логика F5 исправлена)
+                
             } else {
                 initialView.classList.remove('hidden');
                 chatMessagesContainer.classList.add('hidden');
             }
 
-            await loadChatHistory();
+            // ИСПРАВЛЕНИЕ: loadChatHistory() здесь больше не вызывается.
+            // Вместо этого мы просто обновляем подсветку
+            chatHistoryContainer.querySelectorAll('div[data-chat-id]').forEach(item => {
+                const itemChatId = item.dataset.chatId;
+                const link = item.querySelector('a');
+                if (itemChatId === chatId) {
+                    item.classList.add('bg-indigo-200', 'dark:bg-indigo-800');
+                    if(link) link.classList.add('font-semibold');
+                } else {
+                    item.classList.remove('bg-indigo-200', 'dark:bg-indigo-800');
+                    if(link) link.classList.remove('font-semibold');
+                }
+            });
         }
-
 
         newChatBtn.addEventListener('click', () => { window.location.hash = ''; });
 
@@ -539,80 +546,69 @@
             if (!text || !currentUser) return;
 
             const userMessage = { sender: 'user', text };
-            const aiResponse = { sender: 'ai', text: "AI response" };
+            const aiResponse = { sender: 'ai', text: "AI response" }; // Mock response
+
+            // 1. Оптимистичное обновление UI
+            addMessageToUI(userMessage.sender, userMessage.text);
+            showTypingIndicator();
+            setTimeout(() => {
+                hideTypingIndicator();
+                addMessageToUI(aiResponse.sender, aiResponse.text);
+            }, 500); // Имитация "раздумий"
 
             messageInput.value = '';
             updateSendButton();
-            showTypingIndicator();
 
+            // 2. Обновление БД в фоновом режиме
             try {
                 let chatId = activeChatId;
-                let messages = [];
+                let currentMessages = [];
 
                 if (!chatId) {
-                    // создаём новый чат с двумя сообщениями сразу
-                    const { data, error } = await db
-                        .from('chats')
-                        .insert({
-                            user_id: currentUser.id,
-                            title: text.substring(0, 40),
-                            messages: [userMessage, aiResponse]
-                        })
-                        .select('id, messages')
-                        .single();
+                    // Создаем новый чат
+                    const { data, error } = await db.from('chats').insert({
+                        user_id: currentUser.id,
+                        title: text.substring(0, 40),
+                        messages: [userMessage, aiResponse] // Сразу оба сообщения
+                    }).select('id').single();
+                    
                     if (error) throw error;
                     chatId = data.id;
-                    window.location.hash = chatId;
+                    window.location.hash = chatId; // Это вызовет hashchange, который вызовет setActiveChat
+                    await loadChatHistory(); // Перезагружаем список, чтобы увидеть новый чат
+                    setActiveChat(chatId); // Подсвечиваем новый чат
+
                 } else {
-                    // загружаем текущие сообщения
-                    const { data: chatData, error: fetchError } = await db
-                        .from('chats')
-                        .select('messages')
-                        .eq('id', chatId)
-                        .single();
+                    // Обновляем существующий
+                    const { data: chatData, error: fetchError } = await db.from('chats').select('messages').eq('id', chatId).single();
                     if (fetchError) throw fetchError;
 
-                    messages = chatData.messages || [];
-                    // добавляем и юзер, и ответ сразу
-                    const updated = [...messages, userMessage, aiResponse];
-
-                    const { error: updateError } = await db
-                        .from('chats')
-                        .update({ messages: updated })
-                        .eq('id', chatId);
+                    currentMessages = chatData.messages || [];
+                    const updatedMessages = [...currentMessages, userMessage, aiResponse];
+                    
+                    const { error: updateError } = await db.from('chats').update({ messages: updatedMessages }).eq('id', chatId);
                     if (updateError) throw updateError;
                 }
-
-                // UI обновляем сразу, без дублирования
-                hideTypingIndicator();
-                addMessageToUI('user', text);
-                addMessageToUI('ai', aiResponse.text);
-
             } catch (err) {
-                console.error('Ошибка отправки:', err);
-                hideTypingIndicator();
-                addMessageToUI('ai', 'Ошибка при отправке.');
+                console.error('Ошибка отправки сообщения:', err);
+                addMessageToUI('ai', 'Ошибка сохранения... Пожалуйста, обновите страницу.');
             }
         };
-
 
         sendBtn.addEventListener('click', handleSendMessage);
         messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !sendBtn.disabled) handleSendMessage(); });
         messageInput.addEventListener('input', updateSendButton);
 
-        const addMessageToUI = (sender, text, index = null) => {
+        const addMessageToUI = (sender, text) => {
             const messageWrapper = document.createElement('div');
-            if (index !== null) messageWrapper.dataset.index = index;
             messageWrapper.className = `flex mb-4 message-wrapper ${sender === 'user' ? 'justify-end' : 'justify-start'}`;
             const messageBubble = document.createElement('div');
-            messageBubble.className = `max-w-xs lg:max-w-md p-3 rounded-2xl ${sender === 'user' ? 'bg-indigo-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
-                }`;
+            messageBubble.className = `max-w-xs lg:max-w-md p-3 rounded-2xl ${sender === 'user' ? 'bg-indigo-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100'}`;
             messageBubble.textContent = text;
             messageWrapper.appendChild(messageBubble);
             typingIndicator.before(messageWrapper);
             chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
         };
-
 
         const handleUrlChange = () => {
             if (currentUser) {
@@ -623,36 +619,41 @@
 
         window.addEventListener('hashchange', handleUrlChange);
 
-        // --- init: ИСПРАВЛЕННЫЙ ЕДИНЫЙ обработчик ---
-        // Убираем ручной initAuth() и полагаемся только на onAuthStateChange.
-        // Он сработает при загрузке страницы (INITIAL_SESSION/TOKEN_REFRESHED)
-        // и при входе/выходе (SIGNED_IN/SIGNED_OUT).
-        
+        // --- ГЛАВНАЯ ФУНКЦИЯ ИНИЦИАЛИЗАЦИИ ---
+        // Эта функция запускается ОДИН РАЗ, когда сессия становится валидной.
+        const initializeApp = async (user) => {
+            if (currentUser && currentUser.id === user.id) {
+                // Предотвращаем повторный запуск, если событие сработало несколько раз
+                return;
+            }
+            currentUser = user;
+
+            // 1. Показываем UI и загружаем профиль/университет
+            await showChatScreen(currentUser);
+
+            // 2. Загружаем список чатов
+            await loadChatHistory();
+
+            // 3. Загружаем активный чат из URL
+            handleUrlChange();
+        };
+
+        // --- ЕДИНЫЙ ОБРАБОТЧИК АУТЕНТИФИКАЦИИ ---
         db.auth.onAuthStateChange(async (event, session) => {
             
-            if (session && session.user) {
-                // Это срабатывает и при входе, и при обновлении страницы с валидной сессией.
-                currentUser = session.user;
-                
-                // Показываем экран чата и загружаем профиль/университет.
-                // Эта функция УЖЕ содержит loadChatHistory()
-                await showChatScreen(currentUser); 
-                
-                // Загружаем нужный чат из URL (хеша).
-                // Эта функция также вызовет loadChatHistory()
-                handleUrlChange();
-
-            } else {
-                // Это срабатывает при выходе или если сессия не найдена/невалидна.
+            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || (event === 'INITIAL_SESSION' && session)) {
+                // Эти события означают, что у нас есть ВАЛИДНАЯ сессия
+                await initializeApp(session.user);
+            
+            } else if (event === 'SIGNED_OUT') {
+                // Пользователь вышел из системы
                 currentUser = null;
                 activeChatId = null;
-                
-                // Отписываемся от любых каналов
                 if (chatSubscription) {
-                    try { await db.removeChannel(chatSubscription); } catch (e) { /* ignore */ }
+                    try { await db.removeChannel(chatSubscription); } catch (e) {}
                     chatSubscription = null;
                 }
-                // Показываем экран входа.
+                window.location.hash = '';
                 showAuthScreen();
             }
         });
