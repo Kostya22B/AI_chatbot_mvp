@@ -267,36 +267,11 @@
             chatScreen.style.display = 'none';
         };
 
-        const showChatScreen = async (user) => {
+        const showChatScreen = (user) => {
             authScreen.style.display = 'none';
             chatScreen.style.display = 'flex';
             userEmailDisplay.textContent = user.email;
-
-            try {
-                // предполагается relation profiles → universities настроена в Supabase
-                const { data: profile, error } = await db
-                    .from('profiles')
-                    .select('universities(name)')
-                    .eq('id', id)
-                    .single();
-
-                if (error) throw error;
-
-                const uniName = profile?.universities?.name ?? null;
-                if (uniName) {
-                    initialGreeting.textContent = `Hello, student of ${uniName}.`;
-                    greetingHeader.textContent = uniName;
-                } else {
-                    initialGreeting.textContent = `Hello, student.`;
-                    greetingHeader.textContent = `AI Helper`;
-                }
-            } catch (err) {
-                console.error('Could not fetch profile/university', err);
-                initialGreeting.textContent = `Hello, student.`;
-                greetingHeader.textContent = `AI Helper`;
-            }
-
-            await loadChatHistory();
+            loadChatHistory();
         };
 
         const showTypingIndicator = () => {
@@ -526,13 +501,6 @@
             if (!user) return;
             if (currentUser && currentUser.id === user.id) return; // уже инициализирован
             currentUser = user;
-
-            if (user.user_metadata && user.user_metadata.university_name) {
-                welcomeMessage.textContent = `Hello, ${user.user_metadata.university_name} student.`;
-            } else {
-                welcomeMessage.textContent = 'Hello, student.'; // Fallback для старых пользователей
-            }
-
             await showChatScreen(user);
             await loadChatHistory();
             handleUrlChange();
