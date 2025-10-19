@@ -546,62 +546,62 @@
             if (!text || !currentUser) return;
 
             const userMessage = { sender: 'user', text };
-            addMessageToUI(userMessage.sender, userMessage.text);
+            const aiResponse = { sender: 'ai', text: "AI response" };
+
             messageInput.value = '';
             updateSendButton();
             showTypingIndicator();
 
             try {
-                let currentChatId = activeChatId;
-                let existingMessages = [];
+                let chatId = activeChatId;
+                let messages = [];
 
-                if (!currentChatId) {
-                    // Create new chat
-                    const { data, error } = await db.from('chats').insert({
-                        user_id: currentUser.id,
-                        title: text.substring(0, 40),
-                        messages: [userMessage]
-                    }).select('id, messages').single();
+                if (!chatId) {
+                    // создаём новый чат с двумя сообщениями сразу
+                    const { data, error } = await db
+                        .from('chats')
+                        .insert({
+                            user_id: currentUser.id,
+                            title: text.substring(0, 40),
+                            messages: [userMessage, aiResponse]
+                        })
+                        .select('id, messages')
+                        .single();
                     if (error) throw error;
-
-                    currentChatId = data.id;
-                    existingMessages = data.messages;
-                    window.location.hash = currentChatId;
+                    chatId = data.id;
+                    window.location.hash = chatId;
                 } else {
-                    // Fetch latest messages to append to
-                    const { data: chatData, error: fetchError } = await db.from('chats').select('messages').eq('id', currentChatId).single();
+                    // загружаем текущие сообщения
+                    const { data: chatData, error: fetchError } = await db
+                        .from('chats')
+                        .select('messages')
+                        .eq('id', chatId)
+                        .single();
                     if (fetchError) throw fetchError;
 
-                    existingMessages = chatData.messages || [];
+                    messages = chatData.messages || [];
+                    // добавляем и юзер, и ответ сразу
+                    const updated = [...messages, userMessage, aiResponse];
 
-                    // Update DB with user message first
-                    const updatedUserMessages = [...existingMessages, userMessage];
-                    const { error: updateError } = await db.from('chats').update({ messages: updatedUserMessages }).eq('id', currentChatId);
+                    const { error: updateError } = await db
+                        .from('chats')
+                        .update({ messages: updated })
+                        .eq('id', chatId);
                     if (updateError) throw updateError;
                 }
 
-                // --- AI Response Simulation ---
-                setTimeout(() => {
-                    const aiResponse = { sender: 'ai', text: "AI response" };
-                    hideTypingIndicator();
-                    addMessageToUI(aiResponse.sender, aiResponse.text); // Optimistic UI update
-
-                    // Update DB in the background with AI message
-                    const finalMessages = [...existingMessages, userMessage, aiResponse];
-                    db.from('chats')
-                        .update({ messages: finalMessages })
-                        .eq('id', currentChatId)
-                        .then(({ error }) => {
-                            if (error) console.error('Error saving AI response:', error);
-                        });
-                }, 500);
+                // UI обновляем сразу, без дублирования
+                hideTypingIndicator();
+                addMessageToUI('user', text);
+                addMessageToUI('ai', aiResponse.text);
 
             } catch (err) {
-                console.error('Ошибка отправки сообщения:', err);
+                console.error('Ошибка отправки:', err);
                 hideTypingIndicator();
-                addMessageToUI('ai', 'Не удалось отправить сообщение.');
+                addMessageToUI('ai', 'Ошибка при отправке.');
             }
         };
+
 
         sendBtn.addEventListener('click', handleSendMessage);
         messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !sendBtn.disabled) handleSendMessage(); });
