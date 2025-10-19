@@ -444,11 +444,36 @@
 
             chatHistoryContainer.innerHTML = '';
             chats.forEach(chat => {
-                const chatElement = document.createElement('a');
-                chatElement.href = `#${chat.id}`;
-                chatElement.className = `block p-3 my-1 rounded-lg cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors truncate ${chat.id === activeChatId ? 'bg-indigo-200 dark:bg-indigo-800 font-semibold' : ''}`;
-                chatElement.textContent = chat.title || 'Новый чат';
-                chatHistoryContainer.appendChild(chatElement);
+                const chatItem = document.createElement('div');
+                chatItem.className = `flex items-center justify-between p-3 my-1 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors cursor-pointer ${chat.id === activeChatId ? 'bg-indigo-200 dark:bg-indigo-800' : ''}`;
+                
+                const chatLink = document.createElement('a');
+                chatLink.href = `#${chat.id}`;
+                chatLink.className = `truncate flex-1 ${chat.id === activeChatId ? 'font-semibold' : ''}`;
+                chatLink.textContent = chat.title || 'Новый чат';
+
+                const delBtn = document.createElement('button');
+                delBtn.innerHTML = '✕';
+                delBtn.className = 'ml-3 text-red-500 hover:text-red-700 font-bold opacity-60 hover:opacity-100';
+                delBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    if (!confirm('Вы уверены, что хотите удалить этот чат?')) return;
+                    
+                    const { error } = await db.from('chats').delete().eq('id', chat.id);
+                    if (error) {
+                        console.error('Ошибка удаления чата:', error);
+                    } else {
+                        if (chat.id === activeChatId) {
+                            window.location.hash = ''; // Go back to initial screen
+                        }
+                        loadChatHistory(); // Refresh list
+                    }
+                });
+
+                chatItem.appendChild(chatLink);
+                chatItem.appendChild(delBtn);
+                chatHistoryContainer.appendChild(chatItem);
             });
         };
 
@@ -460,8 +485,12 @@
 
             activeChatId = chatId;
             
+            // More robust way to clear previous messages, preserving the typing indicator
+            while (chatMessagesContainer.firstChild && chatMessagesContainer.firstChild !== typingIndicator) {
+                chatMessagesContainer.removeChild(chatMessagesContainer.firstChild);
+            }
+
             if (chatId) {
-                chatMessagesContainer.querySelectorAll('.message-wrapper').forEach(el => el.remove());
                 initialView.classList.add('hidden');
                 chatMessagesContainer.classList.remove('hidden');
                 
@@ -477,9 +506,10 @@
                     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chats', filter: `id=eq.${chatId}` }, payload => {
                         const updatedMessages = payload.new.messages;
                         const currentMessagesCount = chatMessagesContainer.querySelectorAll('.message-wrapper').length;
-                        // Simple refresh if message count is different to avoid complex logic
+                        // Simple refresh if message count is different to avoid complex logic and sync across devices
                         if (updatedMessages && updatedMessages.length !== currentMessagesCount) {
-                            setActiveChat(chatId);
+                           // Re-fetch and render the chat to ensure sync
+                           setActiveChat(chatId);
                         }
                     }).subscribe();
             } else {
@@ -593,5 +623,6 @@
 </body>
 
 </html>
+
 
 
