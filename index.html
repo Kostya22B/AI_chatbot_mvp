@@ -508,6 +508,65 @@
 
         // Подписка на состояния сессии. Это гарантирует, что после reload,
         // когда supabase восстанавливает сессию, сработает INITIAL_SESSION.
+        // --- Защитный патч: глобальные ловцы ошибок и устойчивый auth handler ---
+        window.addEventListener('unhandledrejection', (ev) => {
+            console.warn('Unhandled promise rejection:', ev.reason);
+        });
+        window.addEventListener('error', (ev) => {
+            console.warn('Window error:', ev.error || ev.message);
+        });
+
+        // Посадочный safe-handler, чтобы сторонние ошибки не ломали init
+        const safeInitializeApp = async (session) => {
+            try {
+                if (!session || !session.user) {
+                    console.warn('safeInitializeApp: no session.user', session);
+                    return;
+                }
+                console.log('safeInitializeApp: initializing for', session.user.id);
+                await initializeApp(session.user);
+            } catch (e) {
+                console.error('safeInitializeApp error', e);
+                // fallback: попробуем прочитать сессию напрямую
+                try {
+                    const { data } = await db.auth.getSession();
+                    if (data?.session?.user) {
+                        console.log('safeInitializeApp: fallback session OK', data.session.user.id);
+                        await initializeApp(data.session.user);
+                    } else {
+                        console.warn('safeInitializeApp: fallback no session');
+                        showAuthScreen();
+                    }
+                } catch (e2) {
+                    console.error('safeInitializeApp fallback error', e2);
+                    showAuthScreen();
+                }
+            }
+        };
+
+        // Подписываемся на состояния аутентификации через защищённый handler
+        db.auth.onAuthStateChange((event, session) => {
+            try {
+                console.log('auth event', event, !!session);
+                if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || (event === 'INITIAL_SESSION' && session)) {
+                    safeInitializeApp(session);
+                } else if (event === 'SIGNED_OUT') {
+                    // очистка без исключений
+                    currentUser = null;
+                    activeChatId = null;
+                    try { if (chatSubscription) chatSubscription.unsubscribe(); } catch (e) {/*ignore*/ }
+                    chatSubscription = null;
+                    showAuthScreen();
+                } else {
+                    // на всякий случай обновим список если уже внутри
+                    if (currentUser) loadChatHistory();
+                }
+            } catch (e) {
+                console.error('auth handler top-level error', e);
+                showAuthScreen();
+            }
+        });
+
         db.auth.onAuthStateChange(async (event, session) => {
             if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || (event === 'INITIAL_SESSION' && session)) {
                 // Есть валидная сессия
