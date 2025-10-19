@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
@@ -7,8 +7,6 @@
     <title>University AI Helper</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
@@ -38,49 +36,6 @@
 
         .typing-dot {
             animation: pulse 1.4s infinite;
-        }
-
-        /* Tom Select Styles Override for Dark Mode */
-        .ts-control {
-            background-color: #f3f4f6;
-            /* bg-gray-100 */
-            border-radius: 0.5rem;
-            border: 1px solid #d1d5db;
-            /* border-gray-300 */
-            padding: 0.60rem 0.75rem;
-        }
-
-        .dark .ts-control {
-            background-color: #1f2937;
-            /* dark:bg-gray-800 */
-            border: 1px solid #4b5563;
-            /* dark:border-gray-700 */
-            color: #f9fafb;
-            /* dark:text-gray-100 */
-        }
-
-        .ts-dropdown {
-            background: #ffffff;
-            border: 1px solid #d1d5db;
-        }
-
-        .dark .ts-dropdown {
-            background: #1f2937;
-            border: 1px solid #4b5563;
-        }
-
-        .dark .ts-dropdown .option {
-            color: #f9fafb;
-        }
-
-        .dark .ts-dropdown .option:hover {
-            background-color: #374151;
-            /* dark:bg-gray-600 */
-        }
-
-        .ts-control.invalid {
-            border-color: #ef4444;
-            /* border-red-500 */
         }
     </style>
 </head>
@@ -133,13 +88,6 @@
                             <input id="signup-password" type="password" required
                                 class="w-full p-3 mt-1 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
                         </div>
-                        <div>
-                            <label for="university-select"
-                                class="text-sm font-medium text-gray-600 dark:text-gray-400">Университет</label>
-                            <select id="university-select" placeholder="Выберите университет..." class="mt-1">
-                                <!-- Options will be populated from DB -->
-                            </select>
-                        </div>
                         <p id="signup-error" class="text-red-500 text-sm hidden"></p>
                         <button type="submit"
                             class="w-full bg-indigo-600 text-white p-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">Зарегистрироваться</button>
@@ -188,7 +136,7 @@
             <div class="flex-1 flex flex-col bg-white dark:bg-gray-900">
                 <header
                     class="flex-shrink-0 p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-                    <h1 id="greeting-header" class="text-2xl font-bold">AI Helper</h1>
+                    <h1 class="text-2xl font-bold">AI Helper</h1>
                     <div class="md:hidden">
                         <button id="menu-toggle" class="text-gray-500 focus:outline-none">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"
@@ -212,7 +160,7 @@
                                 </path>
                             </svg>
                         </div>
-                        <h2 id="initial-greeting" class="text-3xl font-bold mb-2">Hello, student.</h2>
+                        <h2 class="text-3xl font-bold mb-2">Hello, student.</h2>
                         <p class="text-lg text-gray-500 dark:text-gray-400">Чем я могу помочь вам сегодня?</p>
                     </div>
 
@@ -308,70 +256,22 @@
         const menuToggle = document.getElementById('menu-toggle');
         const sidebar = document.getElementById('sidebar');
         const typingIndicator = document.getElementById('typing-indicator');
-        const initialGreeting = document.getElementById('initial-greeting');
-        const greetingHeader = document.getElementById('greeting-header');
-        const universitySelect = document.getElementById('university-select');
-
 
         let currentUser = null;
         let activeChatId = null;
-        let tomSelect = null;
+        let chatSubscription = null;
 
         // --- Управление UI ---
         const showAuthScreen = () => {
-            currentUser = null;
-            activeChatId = null;
             authScreen.style.display = 'flex';
             chatScreen.style.display = 'none';
-            loadUniversities();
         };
-        
-        const showChatScreen = async (user) => {
+
+        const showChatScreen = (user) => {
             authScreen.style.display = 'none';
             chatScreen.style.display = 'flex';
             userEmailDisplay.textContent = user.email;
-
-            const { data: profile, error } = await db.from('profiles').select('universities(name)').eq('id', user.id).single();
-            if (error) {
-                console.error("Could not fetch user's university", error);
-                initialGreeting.textContent = `Hello, student.`;
-                greetingHeader.textContent = `AI Helper`;
-            } else if (profile && profile.universities) {
-                const universityName = profile.universities.name;
-                initialGreeting.textContent = `Hello, student of ${universityName}.`;
-                greetingHeader.textContent = universityName;
-            } else {
-                 initialGreeting.textContent = `Hello, student.`;
-                 greetingHeader.textContent = `AI Helper`;
-            }
-        };
-
-        const loadUniversities = async () => {
-            const { data, error } = await db.from('universities').select('id, name');
-            if (error) {
-                console.error('Ошибка загрузки университетов:', error);
-                return;
-            }
-
-            if (tomSelect) {
-                tomSelect.destroy();
-            }
-
-            universitySelect.innerHTML = '<option value="">Выберите университет...</option>';
-            data.forEach(uni => {
-                const option = document.createElement('option');
-                option.value = uni.id;
-                option.textContent = uni.name;
-                universitySelect.appendChild(option);
-            });
-
-            tomSelect = new TomSelect(universitySelect, {
-                create: false,
-                sortField: {
-                    field: "text",
-                    direction: "asc"
-                }
-            });
+            loadChatHistory();
         };
 
         const showTypingIndicator = () => {
@@ -404,35 +304,14 @@
             e.preventDefault();
             const email = document.getElementById('signup-email').value;
             const password = document.getElementById('signup-password').value;
-            const universityId = universitySelect.value;
             const errorEl = document.getElementById('signup-error');
             errorEl.classList.add('hidden');
-            tomSelect.control.classList.remove('invalid');
-
-            if (!universityId) {
-                errorEl.textContent = 'Пожалуйста, выберите университет.';
-                errorEl.classList.remove('hidden');
-                tomSelect.control.classList.add('invalid');
-                return;
-            }
-
-            const { data, error } = await db.auth.signUp({
-                email,
-                password,
-                options: {
-                    data: {
-                        university_id: universityId
-                    }
-                }
-            });
-
+            const { data, error } = await db.auth.signUp({ email, password });
             if (error) {
                 errorEl.textContent = 'Ошибка регистрации. Возможно, пользователь уже существует.';
                 errorEl.classList.remove('hidden');
             } else {
                 alert('Регистрация прошла успешно! Пожалуйста, проверьте свою почту для подтверждения.');
-                signupForm.classList.add('hidden');
-                loginForm.classList.remove('hidden');
             }
         });
 
@@ -440,7 +319,6 @@
             await db.auth.signOut();
             window.location.hash = '';
         });
-
         showSignup.addEventListener('click', (e) => { e.preventDefault(); loginForm.classList.add('hidden'); signupForm.classList.remove('hidden'); });
         showLogin.addEventListener('click', (e) => { e.preventDefault(); signupForm.classList.add('hidden'); loginForm.classList.remove('hidden'); });
         menuToggle.addEventListener('click', toggleSidebar);
@@ -460,28 +338,26 @@
             chatHistoryContainer.innerHTML = '';
             chats.forEach(chat => {
                 const chatItem = document.createElement('div');
-                chatItem.dataset.chatId = chat.id;
-                chatItem.className = `flex items-center justify-between p-3 my-1 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors cursor-pointer`;
-                
+                chatItem.className = 'flex items-center justify-between p-3 my-1 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors';
+
                 const chatLink = document.createElement('a');
                 chatLink.href = `#${chat.id}`;
-                chatLink.className = `truncate flex-1`;
+                chatLink.className = `truncate flex-1 ${chat.id === activeChatId ? 'font-semibold text-indigo-600' : ''}`;
                 chatLink.textContent = chat.title || 'Новый чат';
 
                 const delBtn = document.createElement('button');
                 delBtn.innerHTML = '✕';
-                delBtn.className = 'ml-3 text-red-500 hover:text-red-700 font-bold opacity-60 hover:opacity-100';
+                delBtn.className = 'ml-3 text-red-500 hover:text-red-700 font-bold';
                 delBtn.addEventListener('click', async (e) => {
                     e.stopPropagation();
                     e.preventDefault();
-                    if (!confirm('Вы уверены, что хотите удалить этот чат?')) return;
-
+                    if (!confirm('Удалить этот чат?')) return;
                     const { error } = await db.from('chats').delete().eq('id', chat.id);
-                    if (error) {
-                        console.error('Ошибка удаления чата:', error);
-                    } else {
+                    if (error) console.error('Ошибка удаления:', error);
+                    else {
                         if (chat.id === activeChatId) {
                             window.location.hash = '';
+                            activeChatId = null;
                         }
                         loadChatHistory();
                     }
@@ -491,42 +367,50 @@
                 chatItem.appendChild(delBtn);
                 chatHistoryContainer.appendChild(chatItem);
             });
+
         };
 
         const setActiveChat = async (chatId) => {
+            if (chatSubscription) {
+                chatSubscription.unsubscribe();
+                chatSubscription = null;
+            }
+
             activeChatId = chatId;
-            chatMessagesContainer.querySelectorAll('.message-wrapper').forEach(m => m.remove());
 
             if (chatId) {
+                // Safely remove only message elements, keeping the indicator intact.
+                chatMessagesContainer.querySelectorAll('.message-wrapper').forEach(el => el.remove());
+
                 initialView.classList.add('hidden');
                 chatMessagesContainer.classList.remove('hidden');
 
                 const { data: chat, error } = await db.from('chats').select('messages').eq('id', chatId).single();
+                if (error) { console.error('Ошибка загрузки чата:', error); return; }
 
-                if (error) {
-                    console.error("Failed to load chat messages", error);
-                    return;
-                }
-                if (chat && chat.messages) {
+                if (chat.messages) {
                     chat.messages.forEach(msg => addMessageToUI(msg.sender, msg.text));
                 }
+
+                chatSubscription = db.channel(`chat_${chatId}`)
+                    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chats', filter: `id=eq.${chatId}` }, payload => {
+                        const updatedMessages = payload.new.messages;
+                        if (!updatedMessages) return;
+                        const oldMessagesCount = chatMessagesContainer.querySelectorAll('.message-wrapper').length;
+                        if (updatedMessages.length > oldMessagesCount) {
+                            const lastMessage = updatedMessages[updatedMessages.length - 1];
+                            if (lastMessage.sender === 'ai') {
+                                hideTypingIndicator();
+                                addMessageToUI(lastMessage.sender, lastMessage.text);
+                            }
+                        }
+                    }).subscribe();
             } else {
                 initialView.classList.remove('hidden');
                 chatMessagesContainer.classList.add('hidden');
             }
-
-            chatHistoryContainer.querySelectorAll('div[data-chat-id]').forEach(item => {
-                const itemChatId = item.dataset.chatId;
-                const link = item.querySelector('a');
-                if (itemChatId === chatId) {
-                    item.classList.add('bg-indigo-200', 'dark:bg-indigo-800');
-                    if(link) link.classList.add('font-semibold');
-                } else {
-                    item.classList.remove('bg-indigo-200', 'dark:bg-indigo-800');
-                    if(link) link.classList.remove('font-semibold');
-                }
-            });
-        }
+            loadChatHistory();
+        };
 
         newChatBtn.addEventListener('click', () => { window.location.hash = ''; });
 
@@ -535,49 +419,53 @@
             if (!text || !currentUser) return;
 
             const userMessage = { sender: 'user', text };
-            const aiResponse = { sender: 'ai', text: "AI response" };
-
-            // Очищаем инпут и показываем индикатор
+            addMessageToUI(userMessage.sender, userMessage.text);
             messageInput.value = '';
             updateSendButton();
-            addMessageToUI(userMessage.sender, userMessage.text);
             showTypingIndicator();
 
             try {
-                let chatId = activeChatId;
+                let currentChatId = activeChatId;
+                let currentMessages = [];
 
-                if (!chatId) {
+                if (!currentChatId) {
                     const { data, error } = await db.from('chats').insert({
                         user_id: currentUser.id,
                         title: text.substring(0, 40),
-                        messages: [userMessage, aiResponse]
-                    }).select('id').single();
-                    
+                        messages: [userMessage]
+                    }).select('id, messages').single();
                     if (error) throw error;
-                    chatId = data.id;
-                    hideTypingIndicator();
-                    addMessageToUI(aiResponse.sender, aiResponse.text);
-                    window.location.hash = chatId; // Это обновит URL и вызовет setActiveChat
-                    await loadChatHistory(); // Перезагружаем список чатов
-                    setActiveChat(chatId); // Подсвечиваем новый чат
 
+                    currentChatId = data.id;
+                    currentMessages = data.messages;
+                    window.location.hash = currentChatId;
                 } else {
-                    const { data: chatData, error: fetchError } = await db.from('chats').select('messages').eq('id', chatId).single();
+                    const { data: chatData, error: fetchError } = await db.from('chats').select('messages').eq('id', currentChatId).single();
                     if (fetchError) throw fetchError;
+                    currentMessages = [...(chatData.messages || []), userMessage];
 
-                    const currentMessages = chatData.messages || [];
-                    const updatedMessages = [...currentMessages, userMessage, aiResponse];
-                    
-                    const { error: updateError } = await db.from('chats').update({ messages: updatedMessages }).eq('id', chatId);
+                    const { error: updateError } = await db.from('chats').update({ messages: currentMessages }).eq('id', currentChatId);
                     if (updateError) throw updateError;
-
-                    hideTypingIndicator();
-                    addMessageToUI(aiResponse.sender, aiResponse.text);
                 }
+
+                // Имитация ответа AI с небольшой задержкой для UX
+                setTimeout(async () => {
+                    const aiResponse = { sender: 'ai', text: "AI response" };
+                    hideTypingIndicator();
+                    addMessageToUI(aiResponse.sender, aiResponse.text); // мгновенно показать
+                    try {
+                        const finalMessages = [...currentMessages, aiResponse];
+                        await db.from('chats').update({ messages: finalMessages }).eq('id', currentChatId);
+                    } catch (err) {
+                        console.error('Ошибка при записи в Supabase', err);
+                    }
+                }, 800);
+
+
             } catch (err) {
                 console.error('Ошибка отправки сообщения:', err);
                 hideTypingIndicator();
-                addMessageToUI('ai', 'Ошибка сохранения...');
+                addMessageToUI('ai', 'Не удалось отправить сообщение.');
             }
         };
 
@@ -604,32 +492,41 @@
         };
 
         window.addEventListener('hashchange', handleUrlChange);
-        
-        // --- ФИНАЛЬНЫЙ ОБРАБОТЧИК АУТЕНТИФИКАЦИИ (ИЗ СТАРОЙ ВЕРСИИ) ---
-        const initializeApp = async (user) => {
-             // Предотвращаем повторный запуск, если пользователь уже тот же
-            if (currentUser && currentUser.id === user.id) {
-                return;
-            }
-            currentUser = user;
 
+        // --- AUTH: инициализация через onAuthStateChange (как в старой версии) ---
+        // Добавим глобальную ссылку для отладки (удалить позже если нужно)
+        window.db = db;
+
+        const initializeApp = async (user) => {
+            if (!user) return;
+            if (currentUser && currentUser.id === user.id) return; // уже инициализирован
+            currentUser = user;
             await showChatScreen(user);
             await loadChatHistory();
             handleUrlChange();
         };
 
+        // Подписка на состояния сессии. Это гарантирует, что после reload,
+        // когда supabase восстанавливает сессию, сработает INITIAL_SESSION.
         db.auth.onAuthStateChange(async (event, session) => {
-            if (session) {
-                // Это простое условие работает и при входе, и при обновлении страницы
+            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || (event === 'INITIAL_SESSION' && session)) {
+                // Есть валидная сессия
                 await initializeApp(session.user);
-            } else {
-                // Пользователь не авторизован
+            } else if (event === 'SIGNED_OUT') {
+                // Вышли
+                currentUser = null;
+                activeChatId = null;
+                // отписаться от канала, если есть
+                if (chatSubscription) {
+                    try { chatSubscription.unsubscribe(); } catch (e) {/*ignore*/ }
+                    chatSubscription = null;
+                }
                 showAuthScreen();
             }
         });
+
 
     </script>
 </body>
 
 </html>
-
