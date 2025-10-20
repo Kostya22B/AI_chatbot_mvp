@@ -228,59 +228,30 @@ const ChatScreen = ({ t, user }) => {
     return () => supabase.removeChannel(chatSubscription);
   }, [user]);
 
-  // Найдите эту функцию в src/App.jsx и полностью замените ее:
-  async function handleSendMessage(e) {
-    e.preventDefault();
-    const text = userInput;
+  const handleSendMessage = async (text) => {
+    const userMessage = { sender: 'user', text };
 
-    // Немедленно очищаем поле ввода для пользователя
-    setUserInput("");
+    let currentChatId = activeChatId;
+    let messages = [];
 
-    // --- 1. Отправка и отображение сообщения пользователя ---
-
-    // Отправляем в Supabase и используем .select().single()
-    // чтобы получить созданное сообщение (с id, created_at и т.д.)
-    const { data: userMessage, error: userError } = await supabase
-      .from('messages')
-      .insert([
-        { content: text, role: 'user', chat_id: currentChatId }
-      ])
-      .select()
-      .single();
-
-    if (userError) {
-      console.error('Error sending user message:', userError);
-      return; // Прерываем, если ошибка
+    if (currentChatId) {
+      const existingChat = chats.find(c => c.id === currentChatId);
+      messages = [...(existingChat.messages || []), userMessage];
+      await supabase.from('chats').update({ messages }).eq('id', currentChatId);
+    } else {
+      messages = [userMessage];
+      const { data } = await supabase.from('chats').insert({ user_id: user.id, title: text.substring(0, 30), messages }).select().single();
+      window.location.hash = data.id;
+      currentChatId = data.id;
     }
 
-    // !! Вот фикс: Обновляем состояние React, чтобы сообщение появилось
-    setMessages(prevMessages => [...prevMessages, userMessage]);
-
-    // --- 2. Симуляция и отображение ответа ИИ ---
-    // (Я вернул этот функционал из вашего примера)
-
+    // Simulate AI response
     setTimeout(async () => {
-      // Я предполагаю, что переменная `t` от useTranslation доступна здесь
-      const aiText = t['chat.aiResponse'] || 'This is a simulated AI response.';
-
-      const { data: aiMessage, error: aiError } = await supabase
-        .from('messages')
-        .insert([
-          { content: aiText, role: 'assistant', chat_id: currentChatId }
-        ])
-        .select()
-        .single();
-
-      if (aiError) {
-        console.error('Error sending AI message:', aiError);
-        return;
-      }
-
-      // !! Точно так же обновляем состояние для ответа ИИ
-      setMessages(prevMessages => [...prevMessages, aiMessage]);
-
+      const aiResponse = { sender: 'ai', text: t['chat.aiResponse'] };
+      const finalMessages = [...messages, aiResponse];
+      await supabase.from('chats').update({ messages: finalMessages }).eq('id', currentChatId);
     }, 500);
-  }
+  };
 
   const handleNewChat = () => window.location.hash = '';
 
