@@ -5,7 +5,7 @@ import './index.css'
 
 // --- ВЫБОР ЯЗЫКА ---
 // Чтобы использовать английский, оставьте эту строку:
-import t from './en.json' assert { type: 'json' };
+import t from './locales/en.json' assert { type: 'json' };
 
 // Чтобы использовать японский, закомментируйте строку выше и раскомментируйте эту:
 // import t from './ja.json' assert { type: 'json' };
