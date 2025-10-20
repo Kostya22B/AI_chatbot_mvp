@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { useLocale } from './locale/LocaleSwitcher';
 
 // --- Supabase Client Setup ---
 const supabaseUrl = "https://mmgcxilliiwuskuiiwqf.supabase.co"; // Замените на URL вашего проекта или import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1tZ2N4aWxsaWl3dXNrdWlpd3FmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA1OTQ5MzMsImV4cCI6MjA3NjE3MDkzM30.JIUMJzkV08K_ziQzVSyaqvUF_REZpGOAlyH7_C8tSvw"; // Замените на ваш ключ или import.meta.env.VITE_SUPABASE_ANON_KEY
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// --- Компоненты ---
 
 const AuthScreen = ({ t }) => {
   const [isLogin, setIsLogin] = useState(true);
@@ -457,7 +457,9 @@ const ChatScreen = ({ t, user }) => {
 };
 
 /* ---------- App (исправлён) ---------- */
-function App({ t }) {
+function App() {
+
+  const { t: tFunc, strings } = useLocale();
   const [session, setSession] = useState(null);
 
   useEffect(() => {
@@ -490,7 +492,7 @@ function App({ t }) {
 
   return (
     <div className="relative flex h-screen w-screen antialiased overflow-hidden bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
-      {!session ? <AuthScreen t={t} /> : <ChatScreen t={t} user={session.user} />}
+      {!session ? <AuthScreen t={strings} /> : <ChatScreen t={strings} user={session.user} />}
     </div>
   );
 }

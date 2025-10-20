@@ -1,18 +1,20 @@
+// src/main.jsx
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
 
-// --- ВЫБОР ЯЗЫКА ---
-// Чтобы использовать английский, оставьте эту строку:
-import t from './locales/en.json' assert { type: 'json' };
+import Header from './components/Header.jsx'
 
-// Чтобы использовать японский, закомментируйте строку выше и раскомментируйте эту:
-// import t from './ja.json' assert { type: 'json' };
-
+// LocaleProvider из ранее созданного модуля
+import { LocaleProvider } from './locale/LocaleSwitcher';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <App t={t} /> 
+    <LocaleProvider>
+      <Header />
+      {/* App теперь сам возьмёт t из контекста и прокинет вниз */}
+      <App />
+    </LocaleProvider>
   </React.StrictMode>,
 )
