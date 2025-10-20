@@ -1,12 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
 // --- Supabase Client Setup ---
-// ВАЖНО: Переместите эти ключи в переменные окружения (.env.local) для безопасности в реальном проекте
-// VITE_SUPABASE_URL=...
-// VITE_SUPABASE_ANON_KEY=...
-const supabaseUrl = 'https://mmgcxilliiwuskuiiwqf.supabase.co'; // Замените на URL вашего проекта или import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1tZ2N4aWxsaWl3dXNrdWlpd3FmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA1OTQ5MzMsImV4cCI6MjA3NjE3MDkzM30.JIUMJzkV08K_ziQzVSyaqvUF_REZpGOAlyH7_C8tSvw'; // Замените на ваш ключ или import.meta.env.VITE_SUPABASE_ANON_KEY
+const supabaseUrl = "https://mmgcxilliiwuskuiiwqf.supabase.co"; // Замените на URL вашего проекта или import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1tZ2N4aWxsaWl3dXNrdWlpd3FmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA1OTQ5MzMsImV4cCI6MjA3NjE3MDkzM30.JIUMJzkV08K_ziQzVSyaqvUF_REZpGOAlyH7_C8tSvw"; // Замените на ваш ключ или import.meta.env.VITE_SUPABASE_ANON_KEY
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // --- Компоненты ---
@@ -105,11 +102,10 @@ const AuthScreen = ({ t }) => {
   );
 };
 
-const ChatSidebar = ({ t, user, chats, activeChatId, onNewChat, onLogout }) => {
-  const handleDelete = async (chatId) => {
-    if (confirm(t['sidebar.deleteConfirm'])) {
-      await supabase.from('chats').delete().eq('id', chatId);
-    }
+const ChatSidebar = ({ t, user, chats, activeChatId, onNewChat, onLogout, onDelete }) => {
+  const handleDelete = (chatId) => {
+    if (!confirm(t['sidebar.deleteConfirm'])) return;
+    if (typeof onDelete === 'function') onDelete(chatId);
   };
 
   return (
@@ -154,53 +150,67 @@ const ChatWindow = ({ t, activeChat, universityName, onSendMessage }) => {
     }
   };
 
-  if (!activeChat) {
-    return (
-      <div className="flex-1 flex flex-col justify-center items-center text-center p-4">
-        <h2 className="text-3xl font-bold mb-2">{t['chat.initialGreeting']} {universityName}.</h2>
-        <p className="text-lg text-gray-500 dark:text-gray-400">{t['chat.initialPrompt']}</p>
-      </div>
-    );
-  }
+  const isNewChat = !activeChat;
+  const messages = activeChat?.messages || [];
 
   return (
     <div className="flex-1 flex flex-col bg-white dark:bg-gray-900">
       <header className="flex-shrink-0 p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-        <h1 className="text-2xl font-bold">{activeChat.title || t['sidebar.newChatTitle']}</h1>
+        <h1 className="text-2xl font-bold">{activeChat?.title || t['sidebar.newChatTitle']}</h1>
       </header>
+
+      {/* messages area (empty for new chat) */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 chat-container">
-        {activeChat.messages?.map((msg, index) => (
-          <div key={index} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-xs lg:max-w-md p-3 rounded-2xl ${msg.sender === 'user' ? 'bg-indigo-600 text-white' : 'bg-gray-200 dark:bg-gray-700'}`}>
-              {msg.text}
-            </div>
+        {isNewChat ? (
+          <div className="flex-1 flex flex-col justify-center items-center text-center p-4">
+            <h2 className="text-3xl font-bold mb-2">{t['chat.initialGreeting']} {universityName}.</h2>
+            <p className="text-lg text-gray-500 dark:text-gray-400">{t['chat.initialPrompt']}</p>
           </div>
-        ))}
+        ) : (
+          messages.map((msg, i) => (
+            <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-xs lg:max-w-md p-3 rounded-2xl ${msg.sender === 'user' ? 'bg-indigo-600 text-white' : 'bg-gray-200 dark:bg-gray-700'}`}>
+                {msg.text}
+              </div>
+            </div>
+          ))
+        )}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* input panel — всегда присутствует */}
       <div className="flex-shrink-0 p-4 border-t border-gray-200 dark:border-gray-700">
         <div className="flex items-center space-x-2 md:space-x-4">
-          {/* Model selector can be added here */}
-          <input value={message} onChange={e => setMessage(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleSend()} type="text" placeholder={t['chat.inputPlaceholder']} className="w-full p-3 pr-12 bg-gray-200 dark:bg-gray-700 border border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition" />
+          <input
+            value={message}
+            onChange={e => setMessage(e.target.value)}
+            onKeyPress={e => e.key === 'Enter' && handleSend()}
+            type="text"
+            placeholder={t['chat.inputPlaceholder']}
+            className="w-full p-3 pr-12 bg-gray-200 dark:bg-gray-700 border border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+          />
           <button onClick={handleSend} disabled={!message.trim()} className="px-4 text-indigo-600 dark:text-indigo-400 disabled:opacity-50">
-            {/* Send Icon */}
             {t['chat.sendButton']}
           </button>
         </div>
       </div>
     </div>
   );
-};
+}
 
+/* ---------- ChatScreen (исправлён) ---------- */
 const ChatScreen = ({ t, user }) => {
   const [chats, setChats] = useState([]);
   const [activeChatId, setActiveChatId] = useState(null);
   const [universityName, setUniversityName] = useState('');
 
+  const listChannelRef = useRef(null);
+  const activeChatChannelRef = useRef(null);
+
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '');
-      setActiveChatId(hash);
+      setActiveChatId(hash || null);
     };
     handleHashChange();
     window.addEventListener('hashchange', handleHashChange);
@@ -208,81 +218,263 @@ const ChatScreen = ({ t, user }) => {
   }, []);
 
   useEffect(() => {
-    const fetchUserData = async () => {
-      // Fetch chats
-      const { data: chatData } = await supabase.from('chats').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
-      setChats(chatData || []);
+    if (!user) return;
+    let mounted = true;
 
-      // Fetch profile
-      const { data: profileData } = await supabase.from('profiles').select('universities(name)').eq('id', user.id).single();
-      setUniversityName(profileData?.universities?.name || 'Student');
+    const fetchList = async () => {
+      const { data: chatData, error } = await supabase
+        .from('chats')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      if (!error && mounted) setChats(chatData || []);
     };
+    fetchList();
 
-    fetchUserData();
+    // создаём канал и подписываемся синхронно (без then)
+    const listChannel = supabase.channel(`public:chats:list:${user.id}`);
+    listChannel.on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'chats', filter: `user_id=eq.${user.id}` },
+      (payload) => {
+        setChats((prev) => [payload.new, ...prev.filter((c) => c.id !== payload.new.id)]);
+      }
+    );
+    listChannel.on(
+      'postgres_changes',
+      { event: 'DELETE', schema: 'public', table: 'chats', filter: `user_id=eq.${user.id}` },
+      (payload) => {
+        setChats((prev) => prev.filter((c) => c.id !== payload.old.id));
+        if (String(activeChatId) === String(payload.old.id)) {
+          setActiveChatId(null);
+          try { window.location.hash = ''; } catch (e) { /* ignore */ }
+        }
+      }
+    );
+    listChannel.on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'chats', filter: `user_id=eq.${user.id}` },
+      (payload) => {
+        setChats((prev) => prev.map((c) => (c.id === payload.new.id ? payload.new : c)));
+      }
+    );
 
-    const chatSubscription = supabase
-      .channel('public:chats')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chats' }, () => fetchUserData())
-      .subscribe();
-
-    return () => supabase.removeChannel(chatSubscription);
-  }, [user]);
-
-  const handleSendMessage = async (text) => {
-    const userMessage = { sender: 'user', text };
-
-    let currentChatId = activeChatId;
-    let messages = [];
-
-    if (currentChatId) {
-      const existingChat = chats.find(c => c.id === currentChatId);
-      messages = [...(existingChat.messages || []), userMessage];
-      await supabase.from('chats').update({ messages }).eq('id', currentChatId);
-    } else {
-      messages = [userMessage];
-      const { data } = await supabase.from('chats').insert({ user_id: user.id, title: text.substring(0, 30), messages }).select().single();
-      window.location.hash = data.id;
-      currentChatId = data.id;
+    // подписаться
+    try {
+      listChannel.subscribe();
+      listChannelRef.current = listChannel;
+    } catch (e) {
+      console.warn('List channel subscribe error', e);
     }
 
-    // Simulate AI response
+    return () => {
+      mounted = false;
+      if (listChannelRef.current) {
+        try {
+          supabase.removeChannel(listChannelRef.current);
+        } catch (e) {
+          console.warn('remove list channel', e);
+        }
+        listChannelRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  useEffect(() => {
+    // helper для очистки предыдущей подписки
+    const cleanupActive = () => {
+      if (activeChatChannelRef.current) {
+        try {
+          supabase.removeChannel(activeChatChannelRef.current);
+        } catch (e) {
+          console.warn('remove active chat channel', e);
+        }
+        activeChatChannelRef.current = null;
+      }
+    };
+
+    // не подписываемся на пустой или pending id
+    if (!activeChatId || String(activeChatId).startsWith('pending-')) {
+      cleanupActive();
+      return;
+    }
+
+    const channel = supabase.channel(`chat:messages:${activeChatId}`);
+    channel.on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'chats', filter: `id=eq.${activeChatId}` },
+      (payload) => {
+        setChats((prev) => prev.map((c) => (c.id === payload.new.id ? payload.new : c)));
+      }
+    );
+
+    try {
+      channel.subscribe();
+      activeChatChannelRef.current = channel;
+    } catch (e) {
+      console.warn('Active chat channel subscribe error', e);
+    }
+
+    return () => {
+      cleanupActive();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeChatId]);
+
+  useEffect(() => {
+    if (!user) return;
+    let mounted = true;
+    const fetchProfile = async () => {
+      try {
+        const { data: profileData, error } = await supabase
+          .from('profiles')
+          .select('universities(name)')
+          .eq('id', user.id)
+          .single();
+        if (!error && mounted) setUniversityName(profileData?.universities?.name || 'Student');
+      } catch (e) {
+        console.warn('fetch profile', e);
+      }
+    };
+    fetchProfile();
+    return () => { mounted = false; };
+  }, [user]);
+
+  const handleDeleteChat = async (chatId) => {
+    if (!chatId) return;
+    try {
+      const { error } = await supabase.from('chats').delete().eq('id', chatId);
+      if (error) {
+        console.error('Ошибка удаления чата:', error);
+        return;
+      }
+      setChats((prev) => prev.filter((c) => c.id !== chatId));
+      if (String(activeChatId) === String(chatId)) {
+        setActiveChatId(null);
+        try { window.location.hash = ''; } catch (e) { /* ignore */ }
+        if (activeChatChannelRef.current) {
+          try { supabase.removeChannel(activeChatChannelRef.current); } catch (e) { /* ignore */ }
+          activeChatChannelRef.current = null;
+        }
+      }
+    } catch (e) {
+      console.error('handleDeleteChat', e);
+    }
+  };
+
+  const handleSendMessage = async (text) => {
+    if (!text?.trim()) return;
+    const userMessage = { sender: 'user', text, created_at: new Date().toISOString() };
+    let currentChatId = activeChatId;
+
+    if (currentChatId && !String(currentChatId).startsWith('pending-')) {
+      setChats((prev) => prev.map((c) => (c.id === currentChatId ? { ...c, messages: [...(c.messages || []), userMessage] } : c)));
+    } else {
+      const tempId = 'pending-' + Date.now();
+      const tempChat = { id: tempId, user_id: user.id, title: text.substring(0, 30), messages: [userMessage], created_at: new Date().toISOString() };
+      setChats((prev) => [tempChat, ...prev]);
+      try { window.location.hash = tempId; } catch (e) { /* ignore */ }
+      currentChatId = tempId;
+      setActiveChatId(tempId);
+    }
+
+    try {
+      if (String(currentChatId).startsWith('pending-')) {
+        const { data, error } = await supabase
+          .from('chats')
+          .insert({ user_id: user.id, title: text.substring(0, 30), messages: [userMessage] })
+          .select()
+          .single();
+        if (error) throw error;
+        setChats((prev) => prev.map((c) => (String(c.id) === String(currentChatId) ? { ...data } : c)));
+        try { window.location.hash = data.id; } catch (e) { /* ignore */ }
+        currentChatId = data.id;
+        setActiveChatId(data.id);
+      } else {
+        const { data: existing, error: fetchErr } = await supabase.from('chats').select('messages').eq('id', currentChatId).single();
+        if (fetchErr) throw fetchErr;
+        const newMessages = [...(existing.messages || []), userMessage];
+        await supabase.from('chats').update({ messages: newMessages }).eq('id', currentChatId);
+      }
+    } catch (err) {
+      console.error('Send error', err);
+    }
+
+    const aiPlaceholder = { sender: 'ai', text: '...', temp: true, created_at: new Date().toISOString() };
+    setChats((prev) => prev.map((c) => (String(c.id) === String(currentChatId) ? { ...c, messages: [...(c.messages || []), aiPlaceholder] } : c)));
+
     setTimeout(async () => {
-      const aiResponse = { sender: 'ai', text: t['chat.aiResponse'] };
-      const finalMessages = [...messages, aiResponse];
-      await supabase.from('chats').update({ messages: finalMessages }).eq('id', currentChatId);
+      const aiResponse = { sender: 'ai', text: t['chat.aiResponse'], created_at: new Date().toISOString() };
+      setChats((prev) =>
+        prev.map((c) => {
+          if (String(c.id) !== String(currentChatId)) return c;
+          const msgs = (c.messages || []).map((m) => (m.temp ? aiResponse : m));
+          return { ...c, messages: msgs };
+        })
+      );
+
+      try {
+        const { data: serverChat, error: serverErr } = await supabase.from('chats').select('messages').eq('id', currentChatId).single();
+        if (serverErr) {
+          const finalMessagesFallback = (chats.find((c) => String(c.id) === String(currentChatId))?.messages || []).map((m) => (m.temp ? aiResponse : m));
+          await supabase.from('chats').update({ messages: finalMessagesFallback }).eq('id', currentChatId);
+        } else {
+          const finalMessages = [...(serverChat.messages || []).filter(m => !m.temp), aiResponse];
+          await supabase.from('chats').update({ messages: finalMessages }).eq('id', currentChatId);
+        }
+      } catch (err) {
+        console.error('AI persist error', err);
+      }
     }, 500);
   };
 
-  const handleNewChat = () => window.location.hash = '';
+  const handleNewChat = () => {
+    try { window.location.hash = ''; } catch (e) { /* ignore */ }
+    setActiveChatId(null);
+  };
 
-  const handleLogout = async () => await supabase.auth.signOut();
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+  };
 
-  const activeChat = chats.find(chat => chat.id === activeChatId);
+  const activeChat = chats.find((c) => String(c.id) === String(activeChatId)) || null;
 
   return (
     <div className="w-full h-full flex">
-      <ChatSidebar t={t} user={user} chats={chats} activeChatId={activeChatId} onNewChat={handleNewChat} onLogout={handleLogout} />
+      <ChatSidebar
+        t={t}
+        user={user}
+        chats={chats}
+        activeChatId={activeChatId}
+        onNewChat={handleNewChat}
+        onLogout={handleLogout}
+        onDelete={handleDeleteChat}
+      />
       <ChatWindow t={t} activeChat={activeChat} universityName={universityName} onSendMessage={handleSendMessage} />
     </div>
   );
 };
 
-
-// --- Главный компонент App ---
-
+/* ---------- App (исправлён) ---------- */
 function App({ t }) {
   const [session, setSession] = useState(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // получить текущую сессию
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data?.session || null);
+    });
+
+    // подписка на изменения аутентификации
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-
-    return () => subscription.unsubscribe();
+    return () => {
+      // корректно отписываемся
+      try { sub?.subscription?.unsubscribe(); } catch (e) { /* ignore */ }
+    };
   }, []);
 
   if (supabaseUrl === 'YOUR_SUPABASE_URL' || supabaseAnonKey === 'YOUR_SUPABASE_ANON_KEY') {
