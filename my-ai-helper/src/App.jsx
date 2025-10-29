@@ -3,8 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 import { useLocale } from './locale/LocaleSwitcher';
 
 // --- Supabase Client Setup ---
-const supabaseUrl = "https://mmgcxilliiwuskuiiwqf.supabase.co"; // Замените на URL вашего проекта или import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1tZ2N4aWxsaWl3dXNrdWlpd3FmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA1OTQ5MzMsImV4cCI6MjA3NjE3MDkzM30.JIUMJzkV08K_ziQzVSyaqvUF_REZpGOAlyH7_C8tSvw"; // Замените на ваш ключ или import.meta.env.VITE_SUPABASE_ANON_KEY
+const supabaseUrl = "https://mmgcxilliiwuskuiiwqf.supabase.co";
+const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1tZ2N4aWxsaWl3dXNrdWlpd3FmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA1OTQ5MzMsImV4cCI6MjA3NjE3MDkzM30.JIUMJzkV08K_ziQzVSyaqvUF_REZpGOAlyH7_C8tSvw";
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 
@@ -102,40 +102,66 @@ const AuthScreen = ({ t }) => {
   );
 };
 
-const ChatSidebar = ({ t, user, chats, activeChatId, onNewChat, onLogout, onDelete }) => {
+const ChatSidebar = ({ t, user, chats, activeChatId, onNewChat, onLogout, onDelete, isOpen, onClose }) => {
   const handleDelete = (chatId) => {
     if (!confirm(t['sidebar.deleteConfirm'])) return;
     if (typeof onDelete === 'function') onDelete(chatId);
   };
 
   return (
-    <div className="sidebar absolute md:relative z-20 w-80 md:w-1/4 bg-gray-200 dark:bg-gray-800 p-4 flex flex-col h-full border-r dark:border-gray-700 md:transform-none">
-      <div className="flex-shrink-0 mb-4">
-        <button onClick={onNewChat} className="w-full flex items-center justify-center gap-2 bg-indigo-600 text-white p-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors">
-          {/* Plus Icon */}
-          {t['sidebar.newChat']}
-        </button>
-      </div>
-      <div className="flex-grow overflow-y-auto pr-2 space-y-2 chat-history">
-        {chats.map(chat => (
-          <div key={chat.id} className={`flex items-center justify-between p-3 my-1 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors cursor-pointer ${chat.id === activeChatId ? 'bg-indigo-200 dark:bg-indigo-800' : ''}`}>
-            <a href={`#${chat.id}`} className="truncate flex-1">{chat.title || t['sidebar.newChatTitle']}</a>
-            <button onClick={() => handleDelete(chat.id)} className="ml-3 text-red-500 hover:text-red-700 font-bold opacity-60 hover:opacity-100">✕</button>
-          </div>
-        ))}
-      </div>
-      <div className="flex-shrink-0 mt-4 border-t border-gray-300 dark:border-gray-600 pt-4 space-y-2">
-        <p className="text-sm text-center truncate text-gray-600 dark:text-gray-400">{user?.email}</p>
-        <button onClick={onLogout} className="w-full flex items-center justify-center gap-2 bg-red-600 text-white p-2 rounded-lg font-semibold hover:bg-red-700 transition-colors">
-          {/* Logout Icon */}
-          {t['sidebar.logout']}
-        </button>
+    <div
+      className={
+        "fixed inset-y-0 left-0 md:relative z-30 w-80 md:w-72 bg-gray-200 dark:bg-gray-800 border-r dark:border-gray-700 " +
+        "transform transition-transform duration-200 " +
+        (isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0")
+      }
+    >
+      <div className="h-full flex flex-col p-4">
+        {/* mobile: close */}
+        <div className="md:hidden mb-2 flex justify-end">
+          <button onClick={onClose} aria-label="Close sidebar" className="p-2 rounded hover:bg-gray-300 dark:hover:bg-gray-700">✕</button>
+        </div>
+
+        {/* Верх: New Chat / навигация */}
+        <div className="flex-shrink-0">
+          <button
+            onClick={onNewChat}
+            className="w-full flex items-center justify-center gap-2 bg-indigo-600 text-white p-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
+          >
+            {t['sidebar.newChat']}
+          </button>
+        </div>
+
+        {/* Центр: список чатов со скроллом */}
+        <div className="flex-1 min-h-0 overflow-y-auto pr-2 mt-4 space-y-2">
+          {chats.map(chat => (
+            <div
+              key={chat.id}
+              className={`flex items-center justify-between p-3 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors cursor-pointer ${chat.id === activeChatId ? 'bg-indigo-200 dark:bg-indigo-800' : ''}`}
+            >
+              <a href={`#${chat.id}`} className="truncate flex-1">{chat.title || t['sidebar.newChatTitle']}</a>
+              <button onClick={() => handleDelete(chat.id)} className="ml-3 text-red-500 hover:text-red-700 font-bold opacity-60 hover:opacity-100">✕</button>
+            </div>
+          ))}
+        </div>
+
+        {/* Низ: профиль + logout, прижат к низу */}
+        <div className="flex-shrink-0 pt-4 border-t border-gray-300 dark:border-gray-600">
+          <p className="text-sm text-center truncate text-gray-600 dark:text-gray-400 mb-2">{user?.email}</p>
+          <button
+            onClick={onLogout}
+            className="w-full flex items-center justify-center gap-2 bg-red-600 text-white p-2 rounded-lg font-semibold hover:bg-red-700 transition-colors"
+          >
+            {t['sidebar.logout']}
+          </button>
+        </div>
       </div>
     </div>
   );
-}
+};
 
-const ChatWindow = ({ t, activeChat, universityName, onSendMessage }) => {
+
+const ChatWindow = ({ t, activeChat, universityName, onSendMessage, onOpenSidebar }) => {
   const [message, setMessage] = useState('');
   const messagesEndRef = useRef(null);
 
@@ -156,11 +182,20 @@ const ChatWindow = ({ t, activeChat, universityName, onSendMessage }) => {
   return (
     <div className="flex-1 flex flex-col bg-white dark:bg-gray-900">
       <header className="flex-shrink-0 p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-        <h1 className="text-2xl font-bold">{activeChat?.title || t['sidebar.newChatTitle']}</h1>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onOpenSidebar}
+            aria-label="Open sidebar"
+            className="md:hidden p-2 rounded hover:bg-gray-200 dark:hover:bg-gray-800"
+          >
+            ☰
+          </button>
+          <h1 className="text-2xl font-bold">{activeChat?.title || t['sidebar.newChatTitle']}</h1>
+        </div>
       </header>
 
       {/* messages area (empty for new chat) */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 chat-container">
+      <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
         {isNewChat ? (
           <div className="flex-1 flex flex-col justify-center items-center text-center p-4">
             <h2 className="text-3xl font-bold mb-2">{t['chat.initialGreeting']} {universityName}.</h2>
@@ -179,7 +214,7 @@ const ChatWindow = ({ t, activeChat, universityName, onSendMessage }) => {
       </div>
 
       {/* input panel — всегда присутствует */}
-      <div className="flex-shrink-0 p-4 border-t border-gray-200 dark:border-gray-700">
+      <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 px-6 py-4">
         <div className="flex items-center space-x-2 md:space-x-4">
           <input
             value={message}
@@ -203,6 +238,7 @@ const ChatScreen = ({ t, user }) => {
   const [chats, setChats] = useState([]);
   const [activeChatId, setActiveChatId] = useState(null);
   const [universityName, setUniversityName] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const listChannelRef = useRef(null);
   const activeChatChannelRef = useRef(null);
@@ -441,17 +477,30 @@ const ChatScreen = ({ t, user }) => {
   const activeChat = chats.find((c) => String(c.id) === String(activeChatId)) || null;
 
   return (
-    <div className="w-full h-full flex">
+    <div className="w-full h-full flex relative overflow-hidden">
+      {/* Оверлей под сайдбар — только мобилки */}
+      {sidebarOpen && 
+      <div className="md:hidden fixed inset-0 bg-black/40 z-20" onClick={() => setSidebarOpen(false)} />}
+
       <ChatSidebar
         t={t}
         user={user}
         chats={chats}
         activeChatId={activeChatId}
-        onNewChat={handleNewChat}
+        onNewChat={() => { setSidebarOpen(false); handleNewChat(); }}
         onLogout={handleLogout}
         onDelete={handleDeleteChat}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
       />
-      <ChatWindow t={t} activeChat={activeChat} universityName={universityName} onSendMessage={handleSendMessage} />
+
+      <ChatWindow
+        t={t}
+        activeChat={activeChat}
+        universityName={universityName}
+        onSendMessage={handleSendMessage}
+        onOpenSidebar={() => setSidebarOpen(true)}
+      />
     </div>
   );
 };
@@ -491,7 +540,7 @@ function App() {
   }
 
   return (
-    <div className="relative flex h-screen w-screen antialiased overflow-hidden bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+    <div className="relative flex h-full w-full antialiased overflow-hidden bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
       {!session ? <AuthScreen t={strings} /> : <ChatScreen t={strings} user={session.user} />}
     </div>
   );
