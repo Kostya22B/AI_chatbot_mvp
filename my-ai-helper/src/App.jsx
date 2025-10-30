@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from "react";
 import { createClient } from '@supabase/supabase-js';
 import { useLocale } from './locale/LocaleSwitcher';
 
@@ -6,6 +6,69 @@ import { useLocale } from './locale/LocaleSwitcher';
 const supabaseUrl = "https://mmgcxilliiwuskuiiwqf.supabase.co";
 const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1tZ2N4aWxsaWl3dXNrdWlpd3FmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA1OTQ5MzMsImV4cCI6MjA3NjE3MDkzM30.JIUMJzkV08K_ziQzVSyaqvUF_REZpGOAlyH7_C8tSvw";
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// ------ Profile model + adapters (Supabase) ------
+const DEFAULT_PROFILE = {
+  firstName: "", lastName: "", bio: "",
+  hobbies: [],
+  preferences: { style: "concise", notifications: { email: true, push: false } },
+  schedule: [] // [{ id, title, startISO, endISO, location, source }]
+};
+
+// row -> UI
+function mapRowToProfile(row) {
+  if (!row) return DEFAULT_PROFILE;
+  return {
+    firstName: row.first_name || "",
+    lastName:  row.last_name  || "",
+    bio:       row.bio        || "",
+    hobbies:   row.hobbies    || [],
+    preferences: row.preferences || { style: "concise", notifications: { email: true, push: false } },
+    schedule:  row.schedule   || []
+  };
+}
+
+// UI -> row payload
+function mapProfileToPayload(userId, profile) {
+  return {
+    id: userId,
+    first_name: profile.firstName || null,
+    last_name:  profile.lastName  || null,
+    bio:        profile.bio       || null,
+    hobbies:    profile.hobbies   || [],
+    preferences: profile.preferences || {},
+    schedule:   profile.schedule  || [],
+    updated_at: new Date().toISOString()
+  };
+}
+
+/** Загрузка профиля пользователя */
+export async function fetchProfile(userId) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, first_name, last_name, bio, hobbies, preferences, schedule')
+    .eq('id', userId)
+    .single();
+
+  // если строки нет — вернём дефолт без ошибки
+  if (error && error.code !== 'PGRST116') { // 116 = no rows
+    console.error('fetchProfile error:', error);
+  }
+  return mapRowToProfile(data);
+}
+
+/** Сохранение/апдейт профиля (upsert по id) */
+export async function saveProfileToDB(userId, profile) {
+  const payload = mapProfileToPayload(userId, profile);
+  const { error } = await supabase
+    .from('profiles')
+    .upsert(payload, { onConflict: 'id' }); // требует INSERT/UPDATE RLS
+
+  if (error) {
+    console.error('saveProfileToDB error:', error);
+    throw error;
+  }
+}
 
 
 const AuthScreen = ({ t }) => {
@@ -161,7 +224,7 @@ const ChatSidebar = ({ t, user, chats, activeChatId, onNewChat, onLogout, onDele
 };
 
 
-const ChatWindow = ({ t, activeChat, universityName, onSendMessage, onOpenSidebar }) => {
+const ChatWindow = ({ t, activeChat, universityName, onSendMessage, onOpenSidebar, onOpenProfile }) => {
   const [message, setMessage] = useState('');
   const messagesEndRef = useRef(null);
 
@@ -183,14 +246,14 @@ const ChatWindow = ({ t, activeChat, universityName, onSendMessage, onOpenSideba
     <div className="flex-1 flex flex-col bg-white dark:bg-gray-900">
       <header className="flex-shrink-0 p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
         <div className="flex items-center gap-2">
-          <button
-            onClick={onOpenSidebar}
-            aria-label="Open sidebar"
-            className="md:hidden p-2 rounded hover:bg-gray-200 dark:hover:bg-gray-800"
-          >
-            ☰
-          </button>
+          <button onClick={onOpenSidebar} aria-label="Open sidebar" className="md:hidden p-2 rounded hover:bg-gray-200 dark:hover:bg-gray-800">☰</button>
           <h1 className="text-2xl font-bold">{activeChat?.title || t['sidebar.newChatTitle']}</h1>
+        </div>
+        {/* NEW: кнопка профиля справа */}
+        <div className="flex items-center gap-2">
+          <button onClick={onOpenProfile} aria-label="Open profile" className="p-2 rounded hover:bg-gray-200 dark:hover:bg-gray-800">
+            👤
+          </button>
         </div>
       </header>
 
@@ -239,6 +302,7 @@ const ChatScreen = ({ t, user }) => {
   const [activeChatId, setActiveChatId] = useState(null);
   const [universityName, setUniversityName] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const listChannelRef = useRef(null);
   const activeChatChannelRef = useRef(null);
@@ -478,9 +542,10 @@ const ChatScreen = ({ t, user }) => {
 
   return (
     <div className="w-full h-full flex relative overflow-hidden">
-      {/* Оверлей под сайдбар — только мобилки */}
-      {sidebarOpen && 
-      <div className="md:hidden fixed inset-0 bg-black/40 z-20" onClick={() => setSidebarOpen(false)} />}
+      {/* Overlay sidebar for mobiles */}
+      {(sidebarOpen || profileOpen) && (
+        <div className="fixed inset-0 md:hidden bg-black/40 z-20" onClick={() => { setSidebarOpen(false); setProfileOpen(false); }} />
+      )}
 
       <ChatSidebar
         t={t}
@@ -500,12 +565,199 @@ const ChatScreen = ({ t, user }) => {
         universityName={universityName}
         onSendMessage={handleSendMessage}
         onOpenSidebar={() => setSidebarOpen(true)}
+        onOpenProfile={() => setProfileOpen(true)}
+      />
+
+      <ProfileDrawer
+        isOpen={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        userId={user.id}
       />
     </div>
   );
 };
 
-/* ---------- App (исправлён) ---------- */
+// UI panel
+const ProfileDrawer = ({ isOpen, onClose, userId }) => {
+  const [tab, setTab] = useState("profile");
+  const [profile, setProfile] = useState(DEFAULT_PROFILE);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || !userId) return;
+    let alive = true;
+    setLoading(true);
+    fetchProfile(userId).then(p => { if (alive) setProfile(p); })
+      .finally(() => alive && setLoading(false));
+    return () => { alive = false; };
+  }, [isOpen, userId]);
+
+  const update = async (patch) => {
+    const next = { ...profile, ...patch };
+    setProfile(next);
+    try { await saveProfileToDB(userId, next); } catch {}
+  };
+
+  // helpers
+  const addHobby = (h) => { if (!h) return; update({ hobbies: [...(profile.hobbies||[]), h] }); };
+  const removeHobby = (i) => { const a=[...profile.hobbies]; a.splice(i,1); update({ hobbies:a }); };
+
+  const addEvent = (ev) => { update({ schedule: [...profile.schedule, { id: crypto.randomUUID(), ...ev }] }); };
+  const removeEvent = (id) => { update({ schedule: profile.schedule.filter(e => e.id !== id) }); };
+
+  return (
+    <div
+      className={
+        "fixed inset-y-0 right-0 z-30 w-[28rem] max-w-full bg-gray-50 dark:bg-gray-900 border-l dark:border-gray-700 " +
+        "transform transition-transform duration-200 " +
+        (isOpen ? "translate-x-0" : "translate-x-full")
+      }
+      role="dialog" aria-modal="true"
+    >
+      <div className="h-full flex flex-col">
+        {/* top bar */}
+        <div className="flex-shrink-0 px-4 py-3 border-b dark:border-gray-700 flex items-center justify-between">
+          <div className="flex gap-2">
+            <button onClick={() => setTab("profile")} className={`px-3 py-1 rounded ${tab==="profile"?"bg-indigo-600 text-white":"hover:bg-gray-200 dark:hover:bg-gray-800"}`}>Profile</button>
+            <button onClick={() => setTab("schedule")} className={`px-3 py-1 rounded ${tab==="schedule"?"bg-indigo-600 text-white":"hover:bg-gray-200 dark:hover:bg-gray-800"}`}>Schedule</button>
+            <button onClick={() => setTab("prefs")} className={`px-3 py-1 rounded ${tab==="prefs"?"bg-indigo-600 text-white":"hover:bg-gray-200 dark:hover:bg-gray-800"}`}>Preferences</button>
+          </div>
+          <button onClick={onClose} aria-label="Close profile" className="p-2 rounded hover:bg-gray-200 dark:hover:bg-gray-800">✕</button>
+        </div>
+
+        {/* scrollable content */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-6">
+          {tab === "profile" && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <label className="text-sm">Name
+                  <input value={profile.firstName} onChange={e=>update({firstName:e.target.value})}
+                         className="mt-1 w-full rounded bg-white/80 dark:bg-gray-800 border dark:border-gray-700 p-2" />
+                </label>
+                <label className="text-sm">Surname
+                  <input value={profile.lastName} onChange={e=>update({lastName:e.target.value})}
+                         className="mt-1 w-full rounded bg-white/80 dark:bg-gray-800 border dark:border-gray-700 p-2" />
+                </label>
+              </div>
+
+              <label className="text-sm">Bio / Story
+                <textarea value={profile.bio} onChange={e=>update({bio:e.target.value})}
+                          rows={4} className="mt-1 w-full rounded bg-white/80 dark:bg-gray-800 border dark:border-gray-700 p-2" />
+              </label>
+
+              <div>
+                <div className="text-sm font-medium mb-2">Hobbies</div>
+                <HobbyEditor hobbies={profile.hobbies} onAdd={addHobby} onRemove={removeHobby} />
+              </div>
+            </div>
+          )}
+
+          {tab === "schedule" && (
+            <div className="space-y-4">
+              <div className="flex gap-2 flex-wrap">
+                <button className="px-3 py-2 rounded bg-gray-200 dark:bg-gray-800" onClick={()=>alert('TODO: Google Calendar OAuth + import')}>
+                  Import Google
+                </button>
+                <button className="px-3 py-2 rounded bg-gray-200 dark:bg-gray-800" onClick={()=>alert('TODO: Apple/ICS upload + parse')}>
+                  Import Apple/ICS
+                </button>
+                <button className="px-3 py-2 rounded bg-gray-200 dark:bg-gray-800" onClick={()=>{
+                  const title = prompt("Title?");
+                  const startISO = prompt("Start ISO? e.g. 2025-11-01T10:00:00Z");
+                  const endISO = prompt("End ISO?");
+                  if(title && startISO && endISO) addEvent({ title, startISO, endISO, location:"", source:"manual" });
+                }}>
+                  Add manual
+                </button>
+              </div>
+
+              <div className="text-sm text-gray-500">Список событий (локально). Для интеграции: Google Calendar API / CalDAV. После импорта хранить как JSON.</div>
+
+              <ul className="divide-y dark:divide-gray-800">
+                {profile.schedule.map(ev => (
+                  <li key={ev.id} className="py-3 flex items-start justify-between">
+                    <div className="pr-3">
+                      <div className="font-medium">{ev.title}</div>
+                      <div className="text-xs text-gray-500">{ev.startISO} → {ev.endISO} {ev.location ? `· ${ev.location}`:""} · {ev.source}</div>
+                    </div>
+                    <button onClick={()=>removeEvent(ev.id)} className="px-2 py-1 rounded bg-red-600 text-white">Delete</button>
+                  </li>
+                ))}
+              </ul>
+
+              <details className="bg-gray-100 dark:bg-gray-800 rounded p-3">
+                <summary className="cursor-pointer">Raw JSON</summary>
+                <pre className="mt-2 text-xs overflow-auto">{JSON.stringify(profile.schedule,null,2)}</pre>
+              </details>
+            </div>
+          )}
+
+          {tab === "prefs" && (
+            <div className="space-y-4">
+              <label className="text-sm">Answering style
+                <select
+                  value={profile.preferences?.style || "concise"}
+                  onChange={e=>update({ preferences: { ...profile.preferences, style: e.target.value } })}
+                  className="mt-1 w-full rounded bg-white/80 dark:bg-gray-800 border dark:border-gray-700 p-2"
+                >
+                  <option value="concise">Concise</option>
+                  <option value="detailed">Detailed</option>
+                  <option value="academic">Academic</option>
+                  <option value="casual">Casual</option>
+                </select>
+              </label>
+
+              <fieldset className="space-y-2">
+                <div className="text-sm font-medium">Notifications</div>
+                <label className="flex items-center gap-2">
+                  <input type="checkbox"
+                    checked={profile.preferences?.notifications?.email ?? true}
+                    onChange={e=>update({ preferences: { ...profile.preferences, notifications: { ...profile.preferences.notifications, email: e.target.checked } } })}
+                  />
+                  Email
+                </label>
+                <label className="flex items-center gap-2">
+                  <input type="checkbox"
+                    checked={profile.preferences?.notifications?.push ?? false}
+                    onChange={e=>update({ preferences: { ...profile.preferences, notifications: { ...profile.preferences.notifications, push: e.target.checked } } })}
+                  />
+                  Push
+                </label>
+              </fieldset>
+            </div>
+          )}
+        </div>
+
+        {/* bottom stick footer if нужно — можно добавить позже */}
+      </div>
+    </div>
+  );
+};
+
+// подкомпонент редактирования хобби
+const HobbyEditor = ({ hobbies, onAdd, onRemove }) => {
+  const [draft, setDraft] = React.useState("");
+  return (
+    <div>
+      <div className="flex gap-2 mb-2">
+        <input value={draft} onChange={e=>setDraft(e.target.value)} placeholder="Add hobby"
+               className="flex-1 rounded bg-white/80 dark:bg-gray-800 border dark:border-gray-700 p-2"/>
+        <button onClick={()=>{ onAdd(draft.trim()); setDraft(""); }}
+                className="px-3 py-2 rounded bg-indigo-600 text-white">Add</button>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {(hobbies||[]).map((h,i)=>(
+          <span key={i} className="inline-flex items-center gap-1 px-2 py-1 bg-gray-200 dark:bg-gray-800 rounded">
+            {h}
+            <button onClick={()=>onRemove(i)} className="text-red-600">✕</button>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+/* ---------- App ---------- */
 function App() {
 
   const { t: tFunc, strings } = useLocale();
